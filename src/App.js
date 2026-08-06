@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { DataProvider } from './context/DataContext';
 import Login from './components/Auth/Login';
 import Layout from './components/Layout/Layout';
 import PrincipalDashboard  from './components/Principal/PrincipalDashboard';
@@ -8,14 +9,17 @@ import TeacherDashboard    from './components/Teacher/TeacherDashboard';
 import StudentDashboard    from './components/Student/StudentDashboard';
 import ParentDashboard     from './components/Parent/ParentDashboard';
 import GuestHome           from './components/Guest/GuestHome';
+import StaffPortal         from './components/Staff/StaffPortal';
 
 const defaultTab = {
-  principal:  'dashboard',
-  headmaster: 'dashboard',
-  teacher:    'dashboard',
-  student:    'dashboard',
-  parent:     'dashboard',
-  guest:      'home',
+  principal:    'dashboard',
+  headmaster:   'dashboard',
+  teacher:      'dashboard',
+  student:      'dashboard',
+  parent:       'dashboard',
+  accountant:   'dashboard',
+  support_staff:'dashboard',
+  guest:        'home',
 };
 
 function AppContent() {
@@ -33,12 +37,14 @@ function AppContent() {
   const handleTabChange = (tab) => setActiveTab(tab);
 
   const dashboards = {
-    principal:  <PrincipalDashboard  activeTab={activeTab} />,
-    headmaster: <HeadmasterDashboard activeTab={activeTab} />,
-    teacher:    <TeacherDashboard    activeTab={activeTab} />,
-    student:    <StudentDashboard    activeTab={activeTab} />,
-    parent:     <ParentDashboard     activeTab={activeTab} />,
-    guest:      <GuestHome onLogin={() => {}} />,
+    principal:    <PrincipalDashboard  activeTab={activeTab} />,
+    headmaster:   <HeadmasterDashboard activeTab={activeTab} />,
+    teacher:      <TeacherDashboard    activeTab={activeTab} />,
+    student:      <StudentDashboard    activeTab={activeTab} />,
+    parent:       <ParentDashboard     activeTab={activeTab} />,
+    accountant:   <StaffPortal         activeTab={activeTab} />,
+    support_staff:<StaffPortal         activeTab={activeTab} />,
+    guest:        <GuestHome onLogin={() => {}} />,
   };
 
   return (
@@ -56,7 +62,9 @@ function AppContentWrapper() {
 export default function App() {
   return (
     <AuthProvider>
-      <AppContentWrapper />
+      <DataProvider>
+        <AppContentWrapper />
+      </DataProvider>
     </AuthProvider>
   );
 }

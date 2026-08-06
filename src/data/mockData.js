@@ -1,17 +1,22 @@
 // ─── USERS ───────────────────────────────────────────────────────────────────
 export const users = [
-  { id: 1,  username: 'principal',  password: 'principal123', role: 'principal',  name: 'Dr. Rajesh Kumar',    avatar: 'RK', phone: '+91-98765-43210', email: 'principal@greenwood.edu',   joinDate: '2015-06-01' },
-  { id: 2,  username: 'headmaster', password: 'head123',      role: 'headmaster', name: 'Mrs. Priya Sharma',   avatar: 'PS', phone: '+91-98765-43211', email: 'headmaster@greenwood.edu',  joinDate: '2017-07-15' },
-  { id: 3,  username: 'teacher1',   password: 'teach123',     role: 'teacher',    name: 'Mr. Amit Verma',      avatar: 'AV', phone: '+91-98765-43212', email: 'amit.verma@greenwood.edu',  joinDate: '2018-06-01', subject: 'Mathematics', classesHandled: ['10A','10B','9A'] },
-  { id: 4,  username: 'teacher2',   password: 'teach123',     role: 'teacher',    name: 'Ms. Sunita Patel',    avatar: 'SP', phone: '+91-98765-43213', email: 'sunita.patel@greenwood.edu',joinDate: '2019-07-01', subject: 'Science',     classesHandled: ['10A','8A','8B'] },
-  { id: 5,  username: 'teacher3',   password: 'teach123',     role: 'teacher',    name: 'Mr. John Davis',      avatar: 'JD', phone: '+91-98765-43214', email: 'john.davis@greenwood.edu',  joinDate: '2020-06-01', subject: 'English',     classesHandled: ['10B','9A','9B'] },
-  { id: 6,  username: 'student1',   password: 'stud123',      role: 'student',    name: 'Rahul Singh',         avatar: 'RS', class: '10A', rollNo: '001', parentId: 9,  dob: '2009-05-15', admissionYear: 2020 },
-  { id: 7,  username: 'student2',   password: 'stud123',      role: 'student',    name: 'Priya Kapoor',        avatar: 'PK', class: '10A', rollNo: '002', parentId: 10, dob: '2009-08-22', admissionYear: 2020 },
-  { id: 8,  username: 'student3',   password: 'stud123',      role: 'student',    name: 'Arjun Mehta',         avatar: 'AM', class: '9A',  rollNo: '001', parentId: 11, dob: '2010-03-10', admissionYear: 2021 },
-  { id: 9,  username: 'parent1',    password: 'par123',       role: 'parent',     name: 'Mr. Ravi Singh',      avatar: 'RVS', phone: '+91-98765-43215', email: 'ravi.singh@gmail.com',    childrenIds: [6] },
-  { id: 10, username: 'parent2',    password: 'par123',       role: 'parent',     name: 'Mrs. Anita Kapoor',   avatar: 'ANK', phone: '+91-98765-43216', email: 'anita.kapoor@gmail.com',  childrenIds: [7] },
-  { id: 11, username: 'parent3',    password: 'par123',       role: 'parent',     name: 'Mr. Suresh Mehta',    avatar: 'SRM', phone: '+91-98765-43217', email: 'suresh.mehta@gmail.com',  childrenIds: [8] },
-  { id: 12, username: 'guest',      password: 'guest',        role: 'guest',      name: 'Guest User',          avatar: 'GU' },
+  { id: 1,  username: 'principal',  password: 'principal123', role: 'principal',    name: 'Dr. Rajesh Kumar',    avatar: 'RK',  phone: '+91-98765-43210', email: 'principal@greenwood.edu',    joinDate: '2015-06-01', employeeId: 'EMP001', qualification: 'Ph.D. Education', gender: 'Male',   address: '12, Park Lane, New Delhi' },
+  { id: 2,  username: 'headmaster', password: 'head123',      role: 'headmaster',   name: 'Mrs. Priya Sharma',   avatar: 'PS',  phone: '+91-98765-43211', email: 'headmaster@greenwood.edu',   joinDate: '2017-07-15', employeeId: 'EMP002', qualification: 'M.Ed.',            gender: 'Female', address: '34, Sector 7, New Delhi' },
+  { id: 3,  username: 'teacher1',   password: 'teach123',     role: 'teacher',      name: 'Mr. Amit Verma',      avatar: 'AV',  phone: '+91-98765-43212', email: 'amit.verma@greenwood.edu',   joinDate: '2018-06-01', employeeId: 'EMP003', qualification: 'M.Sc. Mathematics', gender: 'Male',   subject: 'Mathematics', subjects: ['Mathematics'], classesHandled: ['10A','10B','9A'] },
+  { id: 4,  username: 'teacher2',   password: 'teach123',     role: 'teacher',      name: 'Ms. Sunita Patel',    avatar: 'SP',  phone: '+91-98765-43213', email: 'sunita.patel@greenwood.edu', joinDate: '2019-07-01', employeeId: 'EMP004', qualification: 'M.Sc. Science',    gender: 'Female', subject: 'Science',     subjects: ['Science'],     classesHandled: ['10A','8A','8B'] },
+  { id: 5,  username: 'teacher3',   password: 'teach123',     role: 'teacher',      name: 'Mr. John Davis',      avatar: 'JD',  phone: '+91-98765-43214', email: 'john.davis@greenwood.edu',   joinDate: '2020-06-01', employeeId: 'EMP005', qualification: 'M.A. English',     gender: 'Male',   subject: 'English',     subjects: ['English'],     classesHandled: ['10B','9A','9B'] },
+  { id: 6,  username: 'student1',   password: 'stud123',      role: 'student',      name: 'Rahul Singh',         avatar: 'RS',  class: '10A', rollNo: '001', parentId: 9,  dob: '2009-05-15', admissionYear: 2020, bloodGroup: 'O+',  gender: 'Male' },
+  { id: 7,  username: 'student2',   password: 'stud123',      role: 'student',      name: 'Priya Kapoor',        avatar: 'PK',  class: '10A', rollNo: '002', parentId: 10, dob: '2009-08-22', admissionYear: 2020, bloodGroup: 'B+',  gender: 'Female' },
+  { id: 8,  username: 'student3',   password: 'stud123',      role: 'student',      name: 'Arjun Mehta',         avatar: 'AM',  class: '9A',  rollNo: '001', parentId: 11, dob: '2010-03-10', admissionYear: 2021, bloodGroup: 'A+',  gender: 'Male' },
+  { id: 9,  username: 'parent1',    password: 'par123',       role: 'parent',       name: 'Mr. Ravi Singh',      avatar: 'RVS', phone: '+91-98765-43215', email: 'ravi.singh@gmail.com',       childrenIds: [6],  occupation: 'Engineer', gender: 'Male' },
+  { id: 10, username: 'parent2',    password: 'par123',       role: 'parent',       name: 'Mrs. Anita Kapoor',   avatar: 'ANK', phone: '+91-98765-43216', email: 'anita.kapoor@gmail.com',     childrenIds: [7],  occupation: 'Doctor',   gender: 'Female' },
+  { id: 11, username: 'parent3',    password: 'par123',       role: 'parent',       name: 'Mr. Suresh Mehta',    avatar: 'SRM', phone: '+91-98765-43217', email: 'suresh.mehta@gmail.com',     childrenIds: [8],  occupation: 'Business', gender: 'Male' },
+  { id: 12, username: 'guest',      password: 'guest',        role: 'guest',        name: 'Guest User',          avatar: 'GU',  gender: 'Other' },
+  { id: 13, username: 'accountant1',password: 'acc123',       role: 'accountant',   name: 'Ms. Kavya Sharma',    avatar: 'KSH', phone: '+91-98765-43220', email: 'kavya.sharma@greenwood.edu', joinDate: '2019-01-15', employeeId: 'EMP013', qualification: 'B.Com, CA', gender: 'Female', address: '56, Nehru Nagar, Delhi' },
+  { id: 14, username: 'gatekeeper1',password: 'gate123',      role: 'support_staff',name: 'Mr. Ramesh Kumar',    avatar: 'RMK', phone: '+91-98765-43221', email: 'ramesh.kumar@greenwood.edu', joinDate: '2020-03-01', employeeId: 'EMP014', subRole: 'Gate Keeper', shift: 'Morning (6AM-2PM)', gender: 'Male', address: '78, Lajpat Nagar, Delhi' },
+  { id: 15, username: 'watchman1',  password: 'watch123',     role: 'support_staff',name: 'Mr. Vijay Patil',     avatar: 'VJP', phone: '+91-98765-43222', email: 'vijay.patil@greenwood.edu',  joinDate: '2021-06-01', employeeId: 'EMP015', subRole: 'Watchman',    shift: 'Night (10PM-6AM)',  gender: 'Male', address: '90, Rohini, Delhi' },
+  { id: 16, username: 'cleaner1',   password: 'clean123',     role: 'support_staff',name: 'Mrs. Lata Yadav',     avatar: 'LTY', phone: '+91-98765-43223', email: 'lata.yadav@greenwood.edu',   joinDate: '2022-01-10', employeeId: 'EMP016', subRole: 'Cleaner',     shift: 'Morning (6AM-2PM)', gender: 'Female', address: '11, Dwarka, Delhi' },
+  { id: 17, username: 'security1',  password: 'sec123',       role: 'support_staff',name: 'Mr. Deepak Singh',    avatar: 'DPS', phone: '+91-98765-43224', email: 'deepak.singh@greenwood.edu', joinDate: '2021-09-01', employeeId: 'EMP017', subRole: 'Security',    shift: 'Afternoon (2PM-10PM)', gender: 'Male', address: '22, Karol Bagh, Delhi' },
 ];
 
 // ─── CLASSES ─────────────────────────────────────────────────────────────────
@@ -73,11 +78,190 @@ export const examPapers = [
 
 // ─── RESULTS ──────────────────────────────────────────────────────────────────
 export const results = [
-  { studentId: 6, examId: 9,  subject: 'Mathematics', marksObtained: 85, maxMarks: 100, grade: 'A',  remarks: 'Excellent' },
-  { studentId: 6, examId: 10, subject: 'Science',     marksObtained: 78, maxMarks: 100, grade: 'B+', remarks: 'Good'      },
-  { studentId: 7, examId: 9,  subject: 'Mathematics', marksObtained: 91, maxMarks: 100, grade: 'A+', remarks: 'Outstanding' },
-  { studentId: 7, examId: 10, subject: 'Science',     marksObtained: 88, maxMarks: 100, grade: 'A',  remarks: 'Excellent' },
-  { studentId: 8, examId: 9,  subject: 'Mathematics', marksObtained: 72, maxMarks: 100, grade: 'B',  remarks: 'Good'      },
+  { id: 1, studentId: 6, examId: 9,  subject: 'Mathematics', marksObtained: 85, maxMarks: 100, grade: 'A',  percentage: 85, remarks: 'Excellent',    paperId: 3 },
+  { id: 2, studentId: 6, examId: 10, subject: 'Science',     marksObtained: 78, maxMarks: 100, grade: 'B+', percentage: 78, remarks: 'Good',          paperId: null },
+  { id: 3, studentId: 7, examId: 9,  subject: 'Mathematics', marksObtained: 91, maxMarks: 100, grade: 'A+', percentage: 91, remarks: 'Outstanding',   paperId: 3 },
+  { id: 4, studentId: 7, examId: 10, subject: 'Science',     marksObtained: 88, maxMarks: 100, grade: 'A',  percentage: 88, remarks: 'Excellent',     paperId: null },
+  { id: 5, studentId: 8, examId: 9,  subject: 'Mathematics', marksObtained: 72, maxMarks: 100, grade: 'B',  percentage: 72, remarks: 'Good',          paperId: 3 },
+  { id: 6, studentId: 6, examId: 9,  subject: 'English',     marksObtained: 80, maxMarks: 100, grade: 'A',  percentage: 80, remarks: 'Very Good',     paperId: null },
+  { id: 7, studentId: 7, examId: 9,  subject: 'English',     marksObtained: 76, maxMarks: 100, grade: 'B+', percentage: 76, remarks: 'Good',          paperId: null },
+  { id: 8, studentId: 8, examId: 9,  subject: 'English',     marksObtained: 68, maxMarks: 100, grade: 'B',  percentage: 68, remarks: 'Satisfactory', paperId: null },
+];
+
+// ─── QUESTION PAPERS ──────────────────────────────────────────────────────────
+export const questionPapers = [
+  {
+    id: 1,
+    title: 'Unit Test 1 – Mathematics',
+    examId: 1,
+    className: '10A',
+    subject: 'Mathematics',
+    academicYear: '2026-27',
+    maxMarks: 50,
+    duration: '2 hrs',
+    instructions: 'All questions are compulsory. Show all working clearly. Use blue or black pen only.',
+    createdBy: 'Mr. Amit Verma',
+    createdDate: '2026-07-20',
+    status: 'published',
+    sections: [
+      {
+        id: 1, title: 'Section A – Objective Questions', sectionInstructions: 'Choose the correct option. (1 mark each)',
+        questions: [
+          { id: 1, text: 'Which of the following is an irrational number?',              type: 'MCQ',   marks: 1, options: ['√4', '√9', '√2', '3/4'],              answer: '√2' },
+          { id: 2, text: 'The HCF of 12 and 18 is:',                                    type: 'MCQ',   marks: 1, options: ['3', '6', '9', '12'],                  answer: '6' },
+          { id: 3, text: 'The degree of polynomial 3x² + 5x – 2 is:',                   type: 'MCQ',   marks: 1, options: ['1', '2', '3', '5'],                   answer: '2' },
+          { id: 4, text: 'If p(x) = x² – 5x + 6, then p(2) = ?',                        type: 'MCQ',   marks: 1, options: ['-1', '0', '1', '2'],                  answer: '0' },
+          { id: 5, text: 'The product of two consecutive positive integers is divisible by:', type: 'MCQ', marks: 1, options: ['2', '3', '4', '5'],              answer: '2' },
+        ],
+      },
+      {
+        id: 2, title: 'Section B – Short Answer', sectionInstructions: 'Answer each question showing all steps. (3 marks each)',
+        questions: [
+          { id: 6, text: 'Find the HCF and LCM of 12, 15 and 21 using prime factorisation.', type: 'Short', marks: 3, answer: 'HCF = 3, LCM = 420' },
+          { id: 7, text: 'Find the zeroes of p(x) = x² – 3x + 2 and verify the relationship between zeroes and coefficients.', type: 'Short', marks: 3, answer: 'Zeroes: 1 and 2. Sum = 3 = –(–3)/1, Product = 2 = 2/1 ✓' },
+          { id: 8, text: 'Express 156 as a product of its prime factors.',                   type: 'Short', marks: 3, answer: '156 = 2² × 3 × 13' },
+        ],
+      },
+      {
+        id: 3, title: 'Section C – Long Answer', sectionInstructions: 'Show detailed working. (5 marks each)',
+        questions: [
+          { id: 9, text: 'Prove that √2 is irrational using the method of contradiction.',  type: 'Long',  marks: 5, answer: 'Assume √2 = p/q in lowest terms. Then 2q² = p², so p is even. Let p = 2m, then 2q² = 4m², q² = 2m², so q is also even. This contradicts HCF(p,q)=1. Hence √2 is irrational.' },
+          { id: 10, text: 'Divide 2x³ – 3x² + 5x – 6 by x² – x + 1 and verify the division algorithm.', type: 'Long', marks: 5, answer: 'Quotient: 2x – 1, Remainder: 4x – 5. Verification: (x²–x+1)(2x–1)+(4x–5) = 2x³–3x²+5x–6 ✓' },
+        ],
+      },
+    ],
+  },
+  {
+    id: 2,
+    title: 'Unit Test 1 – Science',
+    examId: 2,
+    className: '10A',
+    subject: 'Science',
+    academicYear: '2026-27',
+    maxMarks: 50,
+    duration: '2 hrs',
+    instructions: 'All questions are compulsory. Diagrams must be neat, labelled, and drawn in pencil.',
+    createdBy: 'Ms. Sunita Patel',
+    createdDate: '2026-07-22',
+    status: 'published',
+    sections: [
+      {
+        id: 1, title: 'Section A – Objective Questions', sectionInstructions: 'Choose the correct option. (1 mark each)',
+        questions: [
+          { id: 1, text: 'Which of the following is a physical change?',        type: 'MCQ', marks: 1, options: ['Burning of paper', 'Melting of ice', 'Rusting of iron', 'Digestion of food'], answer: 'Melting of ice' },
+          { id: 2, text: 'The chemical formula of quicklime is:',               type: 'MCQ', marks: 1, options: ['Ca(OH)₂', 'CaO', 'CaCO₃', 'CaCl₂'],                                         answer: 'CaO' },
+          { id: 3, text: 'Acid rain is mainly caused by:',                      type: 'MCQ', marks: 1, options: ['CO₂', 'SO₂ and NO₂', 'O₃', 'CH₄'],                                           answer: 'SO₂ and NO₂' },
+          { id: 4, text: 'pH of a neutral solution is:',                        type: 'MCQ', marks: 1, options: ['0', '7', '14', '1'],                                                          answer: '7' },
+          { id: 5, text: 'Which indicator turns red in acid?',                  type: 'MCQ', marks: 1, options: ['Phenolphthalein', 'Litmus', 'Turmeric', 'Methyl orange'],                     answer: 'Litmus' },
+        ],
+      },
+      {
+        id: 2, title: 'Section B – Short Answer', sectionInstructions: '(3 marks each)',
+        questions: [
+          { id: 6, text: 'Explain the difference between exothermic and endothermic reactions with one example each.', type: 'Short', marks: 3, answer: 'Exothermic: releases heat, e.g. burning of coal. Endothermic: absorbs heat, e.g. photosynthesis.' },
+          { id: 7, text: 'What is a balanced equation? Balance: H₂ + O₂ → H₂O',  type: 'Short', marks: 3, answer: '2H₂ + O₂ → 2H₂O. A balanced equation has equal atoms of each element on both sides.' },
+          { id: 8, text: 'Describe two properties each of acids and bases.',        type: 'Short', marks: 3, answer: 'Acids: sour taste, pH < 7, turns litmus red. Bases: bitter taste, soapy feel, pH > 7, turns litmus blue.' },
+        ],
+      },
+      {
+        id: 3, title: 'Section C – Long Answer', sectionInstructions: '(5 marks each)',
+        questions: [
+          { id: 9, text: 'Explain with a neat labelled diagram the process of photosynthesis. State the conditions necessary for the process.', type: 'Long', marks: 5, answer: '6CO₂ + 6H₂O → C₆H₁₂O₆ + 6O₂. Conditions: sunlight, chlorophyll, CO₂, water. [Draw diagram of leaf cross-section with arrow showing CO₂ in, O₂ out, sunlight arrow, glucose stored.]' },
+          { id: 10, text: 'What is a displacement reaction? Write the chemical equation for iron and copper sulphate solution and state your observations.', type: 'Long', marks: 5, answer: 'Fe + CuSO₄ → FeSO₄ + Cu. Observations: blue colour of solution fades, brown copper deposits on iron nail, nail loses mass.' },
+        ],
+      },
+    ],
+  },
+  {
+    id: 3,
+    title: 'First Term Mathematics – 2025-26',
+    examId: 9,
+    className: '10A',
+    subject: 'Mathematics',
+    academicYear: '2025-26',
+    maxMarks: 100,
+    duration: '3 hrs',
+    instructions: 'All questions are compulsory. No calculator permitted. Show all steps for full marks.',
+    createdBy: 'Mr. Amit Verma',
+    createdDate: '2026-04-14',
+    status: 'published',
+    sections: [
+      {
+        id: 1, title: 'Section A – Multiple Choice (20 marks)', sectionInstructions: '20 questions of 1 mark each. Choose the best option.',
+        questions: [
+          { id: 1, text: 'The sum of exponents of prime factors of 540 is:',          type: 'MCQ', marks: 1, options: ['5', '6', '7', '8'],                          answer: '6' },
+          { id: 2, text: 'If one zero of 4x² – 9 is 3/2, the other zero is:',        type: 'MCQ', marks: 1, options: ['3/2', '–3/2', '2/3', '–2/3'],                answer: '–3/2' },
+          { id: 3, text: 'The discriminant of x² – 2x + 1 = 0 is:',                  type: 'MCQ', marks: 1, options: ['0', '4', '–4', '8'],                          answer: '0' },
+          { id: 4, text: 'The 10th term of AP: 5, 8, 11, 14, … is:',                 type: 'MCQ', marks: 1, options: ['29', '32', '35', '38'],                        answer: '32' },
+          { id: 5, text: 'HCF × LCM = __ for two numbers a and b:',                  type: 'MCQ', marks: 1, options: ['a + b', 'a × b', 'a – b', 'a / b'],           answer: 'a × b' },
+        ],
+      },
+      {
+        id: 2, title: 'Section B – Short Answer I (20 marks)', sectionInstructions: '10 questions of 2 marks each.',
+        questions: [
+          { id: 6, text: 'Find the LCM of 96 and 360.',                                  type: 'Short', marks: 2, answer: '720' },
+          { id: 7, text: 'If α, β are zeroes of x² + 7x + 10, find α² + β².',           type: 'Short', marks: 2, answer: 'α+β=–7, αβ=10. α²+β²=(α+β)²–2αβ=49–20=29' },
+          { id: 8, text: 'Solve: 2x + 3y = 11 and 2x – 4y = –24.',                      type: 'Short', marks: 2, answer: 'y = 5, x = –2' },
+          { id: 9, text: 'Find k so that kx(x–2) + 6 = 0 has equal roots.',             type: 'Short', marks: 2, answer: 'k = 6' },
+          { id: 10, text: 'In an AP, a₃ = 4 and a₉ = –8. Which term is zero?',          type: 'Short', marks: 2, answer: '6th term (a₆ = 0)' },
+        ],
+      },
+      {
+        id: 3, title: 'Section C – Short Answer II (30 marks)', sectionInstructions: '10 questions of 3 marks each.',
+        questions: [
+          { id: 11, text: 'Prove that 5√3 is irrational.',                               type: 'Short', marks: 3, answer: 'Assume 5√3 = p/q. Then √3 = p/5q, which is rational. But √3 is irrational. Contradiction.' },
+          { id: 12, text: 'Find all zeroes of 2x⁴ – 3x³ – 3x² + 6x – 2 given √2 and –√2 are two zeroes.', type: 'Short', marks: 3, answer: '(x²–2) divides 2x⁴–3x³–3x²+6x–2. Quotient: 2x²–3x+1. Other zeroes: 1, 1/2.' },
+          { id: 13, text: 'A fraction becomes 9/11 if 2 is added to both numerator and denominator. If 3 is added to both, it becomes 5/6. Find the fraction.', type: 'Short', marks: 3, answer: '7/9' },
+          { id: 14, text: 'The sum of a two-digit number and the number obtained by reversing its digits is 99. If the digits differ by 3, find the number.', type: 'Short', marks: 3, answer: '36 or 63' },
+        ],
+      },
+      {
+        id: 4, title: 'Section D – Long Answer (30 marks)', sectionInstructions: '6 questions of 5 marks each.',
+        questions: [
+          { id: 15, text: 'Solve graphically: 2x + y = 6 and 2x – y = 2. Also find the vertices of the triangle formed with the x-axis.', type: 'Long', marks: 5, answer: 'Intersection: (2, 2). X-intercepts: (3, 0) and (1, 0). Triangle vertices: (2,2), (3,0), (1,0). Area = 2 sq units.' },
+          { id: 16, text: 'The sum of first n terms of an AP is 5n² – 3n. Find the AP and its 20th term.', type: 'Long', marks: 5, answer: 'a₁ = S₁ = 2. a₂ = S₂ – S₁ = 14. d = 12. AP: 2, 14, 26, … a₂₀ = 2 + 19 × 12 = 230.' },
+          { id: 17, text: 'Prove that the ratio of the areas of two similar triangles is equal to the ratio of the squares of their corresponding sides.', type: 'Long', marks: 5, answer: '[Standard proof with diagram: Draw altitudes, prove triangles similar, ratio of areas = ratio of products of bases and heights = ratio of squares of sides.]' },
+        ],
+      },
+    ],
+  },
+  {
+    id: 4,
+    title: 'Unit Test 1 – English',
+    examId: 3,
+    className: '10A',
+    subject: 'English',
+    academicYear: '2026-27',
+    maxMarks: 50,
+    duration: '2 hrs',
+    instructions: 'Attempt all sections. Write in clear, legible handwriting. Grammatical accuracy will be considered.',
+    createdBy: 'Mr. John Davis',
+    createdDate: '2026-07-24',
+    status: 'draft',
+    sections: [
+      {
+        id: 1, title: 'Section A – Reading Comprehension', sectionInstructions: '(10 marks)',
+        questions: [
+          { id: 1, text: 'Read the following passage and answer the questions below:\n\n"The Himalayan ecosystem is one of the most fragile on Earth. Climate change has caused glaciers to retreat at an alarming rate, threatening water supplies for hundreds of millions of people across South Asia…"\n\n(a) What makes the Himalayan ecosystem fragile? (2 marks)\n(b) How does climate change affect glaciers? (2 marks)\n(c) What are the consequences for people? (2 marks)\n(d) Suggest two measures to protect Himalayan glaciers. (4 marks)', type: 'Long', marks: 10, answer: '(a) Sensitive to temperature changes, biodiversity, altitude. (b) Causes retreat, reduces ice mass. (c) Water scarcity for 100s of millions. (d) Reduce emissions, afforestation, sustainable tourism.' },
+        ],
+      },
+      {
+        id: 2, title: 'Section B – Grammar & Language', sectionInstructions: 'Attempt all questions.',
+        questions: [
+          { id: 2, text: 'Change the following sentences into Passive Voice:\n(a) She wrote the letter. (1 mark)\n(b) They are building a new bridge. (1 mark)\n(c) He will complete the project tomorrow. (1 mark)', type: 'Short', marks: 3, answer: '(a) The letter was written by her. (b) A new bridge is being built by them. (c) The project will be completed by him tomorrow.' },
+          { id: 3, text: 'Fill in the blanks with correct form of verbs in brackets:\n(a) She _____ (play) tennis every day. (b) They _____ (arrive) by the time we reached. (c) He _____ (read) the novel since morning.', type: 'Short', marks: 3, answer: '(a) plays (b) had arrived (c) has been reading' },
+          { id: 4, text: 'Identify the type of clause in the following sentences and state its function:\n(a) "The book that she borrowed was very interesting." (2 marks)', type: 'Short', marks: 2, answer: '"that she borrowed" – Relative/Adjective clause; modifies "the book".' },
+        ],
+      },
+      {
+        id: 3, title: 'Section C – Writing', sectionInstructions: '(15 marks)',
+        questions: [
+          { id: 5, text: 'Write a letter to the Editor of a local newspaper expressing your concern about increasing noise pollution in your city. (120–150 words)', type: 'Long', marks: 7, answer: '[Format: Sender address, date, Editor address, subject, salutation, body with causes/effects/suggestions, closing, name/signature]' },
+          { id: 6, text: 'Write a short paragraph (80–100 words) on the importance of reading books in the age of digital media.', type: 'Long', marks: 8, answer: '[Evaluate: content, language, coherence, vocabulary, grammar]' },
+        ],
+      },
+    ],
+  },
 ];
 
 // ─── ATTENDANCE ───────────────────────────────────────────────────────────────
@@ -204,10 +388,12 @@ export const schoolInfo = {
 };
 
 export const getDemoCredentials = () => [
-  { role: 'Principal',  username: 'principal',  password: 'principal123' },
-  { role: 'Headmaster', username: 'headmaster', password: 'head123'      },
-  { role: 'Teacher',    username: 'teacher1',   password: 'teach123'     },
-  { role: 'Student',    username: 'student1',   password: 'stud123'      },
-  { role: 'Parent',     username: 'parent1',    password: 'par123'       },
-  { role: 'Guest',      username: 'guest',      password: 'guest'        },
+  { role: 'Principal',     username: 'principal',   password: 'principal123' },
+  { role: 'Headmaster',    username: 'headmaster',  password: 'head123'      },
+  { role: 'Teacher',       username: 'teacher1',    password: 'teach123'     },
+  { role: 'Student',       username: 'student1',    password: 'stud123'      },
+  { role: 'Parent',        username: 'parent1',     password: 'par123'       },
+  { role: 'Accountant',    username: 'accountant1', password: 'acc123'       },
+  { role: 'Support Staff', username: 'gatekeeper1', password: 'gate123'      },
+  { role: 'Guest',         username: 'guest',       password: 'guest'        },
 ];

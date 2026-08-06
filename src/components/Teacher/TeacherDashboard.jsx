@@ -1,6 +1,11 @@
 import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { users, classes, attendance, notes, homework, exams, results, timetable, holidays, messages } from '../../data/mockData';
+import { useData } from '../../context/DataContext';
+import { users, results, timetable, messages } from '../../data/mockData';
+import QuestionPaperManagement  from '../Exams/QuestionPaperManagement';
+import AttendanceManagement     from '../Management/AttendanceManagement';
+import HomeworkManagement       from '../Management/HomeworkManagement';
+import NotesManagement          from '../Management/NotesManagement';
 
 function StatCard({ icon, label, value, color }) {
   return (
@@ -16,10 +21,12 @@ function StatCard({ icon, label, value, color }) {
 
 /* ── Dashboard ──────────────────────────────────────────────── */
 function Dashboard({ teacher }) {
+  const { notes, homework, exams } = useData();
+  const { allUsers } = useAuth();
   const myNotes    = notes.filter(n => n.uploadedBy === teacher.name);
   const myHomework = homework.filter(h => h.assignedBy === teacher.name);
   const myExams    = exams.filter(e => teacher.classesHandled?.includes(e.class) && e.subject === teacher.subject);
-  const myStudents = users.filter(u => u.role === 'student' && teacher.classesHandled?.includes(u.class));
+  const myStudents = allUsers.filter(u => u.role === 'student' && teacher.classesHandled?.includes(u.class));
   const unread     = messages.filter(m => m.toId === teacher.id && !m.read);
 
   return (
@@ -137,6 +144,8 @@ function Dashboard({ teacher }) {
 
 /* ── My Classes ─────────────────────────────────────────────── */
 function MyClasses({ teacher }) {
+  const { classes, attendance } = useData();
+  const { allUsers } = useAuth();
   const myClasses = classes.filter(c => teacher.classesHandled?.includes(c.name));
 
   return (
@@ -149,7 +158,7 @@ function MyClasses({ teacher }) {
       </div>
       <div className="dashboard-grid grid-3">
         {myClasses.map(cls => {
-          const studentCount = users.filter(u => u.role === 'student' && u.class === cls.name).length;
+          const studentCount = allUsers.filter(u => u.role === 'student' && u.class === cls.name).length;
           const attRec = attendance.filter(a => a.class === cls.name);
           const avgAtt = attRec.length ? Math.round(attRec.filter(a => a.status === 'Present').length / attRec.length * 100) : 0;
 
@@ -183,215 +192,10 @@ function MyClasses({ teacher }) {
   );
 }
 
-/* ── Mark Attendance ────────────────────────────────────────── */
-function MarkAttendance({ teacher }) {
-  const [selectedClass, setSelectedClass] = useState(teacher.classesHandled?.[0] || '10A');
-  const [date, setDate] = useState('2026-08-04');
-  const classStudents = users.filter(u => u.role === 'student' && u.class === selectedClass);
-  const [attState, setAttState] = useState(() => {
-    const init = {};
-    classStudents.forEach(s => { init[s.id] = 'Present'; });
-    return init;
-  });
-
-  const toggle = (id, val) => setAttState(prev => ({ ...prev, [id]: val }));
-
-  return (
-    <div>
-      <div className="page-header">
-        <div className="page-header-left"><h1>Mark Attendance</h1></div>
-        <div className="page-header-actions">
-          <select className="form-control" style={{ width: 120 }}
-            value={selectedClass} onChange={e => setSelectedClass(e.target.value)}>
-            {teacher.classesHandled?.map(c => <option key={c} value={c}>Class {c}</option>)}
-          </select>
-          <input type="date" className="form-control" style={{ width: 160 }}
-            value={date} onChange={e => setDate(e.target.value)} />
-          <button className="btn btn-primary">Save Attendance</button>
-        </div>
-      </div>
-
-      <div className="card">
-        <div className="card-header">
-          <div className="card-title">Class {selectedClass} — {date}</div>
-          <div style={{ display:'flex', gap: 8 }}>
-            <button className="btn btn-success btn-sm" onClick={() => { const n = {}; classStudents.forEach(s => { n[s.id] = 'Present'; }); setAttState(n); }}>All Present</button>
-            <button className="btn btn-danger btn-sm"  onClick={() => { const n = {}; classStudents.forEach(s => { n[s.id] = 'Absent'; });  setAttState(n); }}>All Absent</button>
-          </div>
-        </div>
-        <div className="table-wrapper">
-          <table>
-            <thead><tr><th>Roll No</th><th>Student Name</th><th>Present</th><th>Absent</th><th>Late</th></tr></thead>
-            <tbody>
-              {classStudents.map(s => (
-                <tr key={s.id}>
-                  <td>{s.rollNo}</td>
-                  <td>
-                    <div style={{ display:'flex', alignItems:'center', gap: 8 }}>
-                      <span className="avatar avatar-sm role-student">{s.avatar}</span>
-                      {s.name}
-                    </div>
-                  </td>
-                  {['Present','Absent','Late'].map(status => (
-                    <td key={status}>
-                      <label style={{ display:'flex', alignItems:'center', justifyContent:'center', gap: 6, cursor:'pointer' }}>
-                        <input type="radio" name={`att-${s.id}`} checked={attState[s.id] === status}
-                          onChange={() => toggle(s.id, status)} />
-                      </label>
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ── Upload Notes ───────────────────────────────────────────── */
-function UploadNotes({ teacher }) {
-  const [showForm, setShowForm] = useState(false);
-  const myNotes = notes.filter(n => n.uploadedBy === teacher.name);
-
-  return (
-    <div>
-      <div className="page-header">
-        <div className="page-header-left">
-          <h1>Study Materials</h1>
-          <p>Notes and resources for your classes</p>
-        </div>
-        <button className="btn btn-primary" onClick={() => setShowForm(s => !s)}>
-          {showForm ? 'Cancel' : '+ Upload Notes'}
-        </button>
-      </div>
-
-      {showForm && (
-        <div className="card mb-20">
-          <div className="card-header"><div className="card-title">Upload New Material</div></div>
-          <div className="card-body">
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap: 16 }}>
-              <div className="form-group">
-                <label className="form-label">Title</label>
-                <input className="form-control" placeholder="e.g. Chapter 4: Quadratic Equations" />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Class</label>
-                <select className="form-control">
-                  {teacher.classesHandled?.map(c => <option key={c}>{c}</option>)}
-                </select>
-              </div>
-              <div className="form-group">
-                <label className="form-label">Subject</label>
-                <input className="form-control" value={teacher.subject} readOnly />
-              </div>
-              <div className="form-group">
-                <label className="form-label">File Type</label>
-                <select className="form-control"><option>PDF</option><option>DOCX</option><option>PPT</option></select>
-              </div>
-            </div>
-            <div className="form-group">
-              <label className="form-label">Description</label>
-              <textarea className="form-control" placeholder="Brief description of the material…" />
-            </div>
-            <div style={{ border:'2px dashed var(--border)', borderRadius: 8, padding: 24, textAlign:'center', cursor:'pointer', color:'var(--text-muted)' }}>
-              📂 Click to select file or drag & drop here
-            </div>
-            <button className="btn btn-primary" style={{ marginTop: 16 }}>Upload</button>
-          </div>
-        </div>
-      )}
-
-      <div className="card">
-        <div className="table-wrapper">
-          <table>
-            <thead><tr><th>Subject</th><th>Title</th><th>Class</th><th>Date</th><th>Type</th><th>Downloads</th><th>Actions</th></tr></thead>
-            <tbody>
-              {notes.map(n => (
-                <tr key={n.id}>
-                  <td>{n.subject}</td>
-                  <td style={{ fontWeight: 500 }}>{n.title}</td>
-                  <td><span className="badge badge-info">{n.class}</span></td>
-                  <td style={{ fontSize: 12 }}>{n.date}</td>
-                  <td><span className="badge badge-gray">{n.fileType}</span></td>
-                  <td>{n.downloads}</td>
-                  <td>
-                    <div style={{ display:'flex', gap: 6 }}>
-                      <button className="btn btn-ghost btn-sm">Edit</button>
-                      <button className="btn btn-danger btn-sm">Delete</button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ── Assignments ────────────────────────────────────────────── */
-function Assignments({ teacher }) {
-  const [showForm, setShowForm] = useState(false);
-  const myHW = homework.filter(h => h.assignedBy === teacher.name);
-
-  return (
-    <div>
-      <div className="page-header">
-        <div className="page-header-left"><h1>Assignments / Homework</h1></div>
-        <button className="btn btn-primary" onClick={() => setShowForm(s => !s)}>
-          {showForm ? 'Cancel' : '+ New Assignment'}
-        </button>
-      </div>
-
-      {showForm && (
-        <div className="card mb-20">
-          <div className="card-header"><div className="card-title">Create Assignment</div></div>
-          <div className="card-body">
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap: 16 }}>
-              <div className="form-group"><label className="form-label">Title</label><input className="form-control" placeholder="Assignment title" /></div>
-              <div className="form-group"><label className="form-label">Class</label><select className="form-control">{teacher.classesHandled?.map(c=><option key={c}>{c}</option>)}</select></div>
-              <div className="form-group"><label className="form-label">Due Date</label><input className="form-control" type="date" /></div>
-              <div className="form-group"><label className="form-label">Subject</label><input className="form-control" value={teacher.subject} readOnly /></div>
-            </div>
-            <div className="form-group"><label className="form-label">Description</label><textarea className="form-control" rows={3} /></div>
-            <button className="btn btn-primary">Assign</button>
-          </div>
-        </div>
-      )}
-
-      <div className="card">
-        <div className="table-wrapper">
-          <table>
-            <thead><tr><th>Subject</th><th>Title</th><th>Class</th><th>Assigned</th><th>Due</th><th>Status</th><th>Grade</th></tr></thead>
-            <tbody>
-              {homework.map(hw => (
-                <tr key={hw.id}>
-                  <td>{hw.subject}</td>
-                  <td style={{ fontWeight: 500 }}>{hw.title}</td>
-                  <td><span className="badge badge-info">{hw.class}</span></td>
-                  <td style={{ fontSize: 12 }}>{hw.assignedDate}</td>
-                  <td style={{ fontSize: 12 }}>{hw.dueDate}</td>
-                  <td>
-                    <span className={`badge badge-${hw.status === 'graded' ? 'success' : hw.status === 'submitted' ? 'info' : 'warning'}`}>
-                      {hw.status}
-                    </span>
-                  </td>
-                  <td>{hw.grade || '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 /* ── Grade Book ────────────────────────────────────────────── */
 function GradeBook({ teacher }) {
+  const { exams } = useData();
+  const { allUsers } = useAuth();
   const myResults = results.filter(r => r.subject === teacher.subject);
 
   return (
@@ -405,18 +209,15 @@ function GradeBook({ teacher }) {
             <thead><tr><th>Student</th><th>Exam</th><th>Marks Obtained</th><th>Max Marks</th><th>Percentage</th><th>Grade</th><th>Remarks</th></tr></thead>
             <tbody>
               {myResults.map((r, i) => {
-                const s    = users.find(u => u.id === r.studentId);
-                const exam = exams.find(e => e.id === r.examId);
-                const pct  = Math.round(r.marksObtained / r.maxMarks * 100);
+                const pct = Math.round(r.marksObtained / r.maxMarks * 100);
                 return (
                   <tr key={i}>
                     <td>
                       <div style={{ display:'flex', alignItems:'center', gap: 8 }}>
-                        <span className="avatar avatar-sm role-student">{s?.avatar}</span>
-                        {s?.name}
+                        {(() => { const st = allUsers.find(u => u.id === r.studentId); return <><span className="avatar avatar-sm role-student">{st?.avatar}</span>{st?.name}</>; })()}
                       </div>
                     </td>
-                    <td>{exam?.name}</td>
+                    <td>{exams.find(e => e.id === r.examId)?.name}</td>
                     <td style={{ fontWeight: 600 }}>{r.marksObtained}</td>
                     <td>{r.maxMarks}</td>
                     <td>
@@ -451,6 +252,7 @@ function GradeBook({ teacher }) {
 
 /* ── Holidays ──────────────────────────────────────────────── */
 function HolidayView() {
+  const { holidays } = useData();
   const badgeColors = { National: 'badge-danger', Festival: 'badge-warning', Regional: 'badge-purple' };
   return (
     <div>
@@ -513,6 +315,7 @@ function TeacherTimetable({ teacher }) {
 
 /* ── Exams ─────────────────────────────────────────────────── */
 function ExamsView({ teacher }) {
+  const { exams } = useData();
   const myExams = exams.filter(e => e.subject === teacher.subject);
   return (
     <div>
@@ -608,16 +411,17 @@ export default function TeacherDashboard({ activeTab }) {
   const teacher = currentUser;
 
   const views = {
-    dashboard: <Dashboard teacher={teacher} />,
-    myclasses: <MyClasses teacher={teacher} />,
-    timetable: <TeacherTimetable teacher={teacher} />,
-    attendance:<MarkAttendance teacher={teacher} />,
-    notes:     <UploadNotes teacher={teacher} />,
-    homework:  <Assignments teacher={teacher} />,
-    exams:     <ExamsView teacher={teacher} />,
-    gradebook: <GradeBook teacher={teacher} />,
-    holidays:  <HolidayView />,
-    messages:  <MessagesView teacher={teacher} />,
+    dashboard:        <Dashboard teacher={teacher} />,
+    myclasses:        <MyClasses teacher={teacher} />,
+    timetable:        <TeacherTimetable teacher={teacher} />,
+    attendance:       <AttendanceManagement />,
+    notes:            <NotesManagement />,
+    homework:         <HomeworkManagement />,
+    exams:            <ExamsView teacher={teacher} />,
+    'question-papers':<QuestionPaperManagement />,
+    gradebook:        <GradeBook teacher={teacher} />,
+    holidays:         <HolidayView />,
+    messages:         <MessagesView teacher={teacher} />,
   };
   return views[activeTab] || <Dashboard teacher={teacher} />;
 }

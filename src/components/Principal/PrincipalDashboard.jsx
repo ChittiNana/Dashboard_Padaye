@@ -1,12 +1,15 @@
 import { useState } from 'react';
-import {
-  users, classes, announcements, attendance, exams, fees, staffAttendance,
-  schoolInfo, holidays, homework, results
-} from '../../data/mockData';
-
-const teachers  = users.filter(u => u.role === 'teacher');
-const students  = users.filter(u => u.role === 'student');
-const parents   = users.filter(u => u.role === 'parent');
+import { useData } from '../../context/DataContext';
+import { useAuth } from '../../context/AuthContext';
+import { schoolInfo, results } from '../../data/mockData';
+import Registration          from '../Auth/Registration';
+import QuestionPaperManagement from '../Exams/QuestionPaperManagement';
+import ClassManagement        from '../Management/ClassManagement';
+import ExamManagement         from '../Management/ExamManagement';
+import NoticeManagement       from '../Management/NoticeManagement';
+import HolidayManagement      from '../Management/HolidayManagement';
+import FeeManagement          from '../Management/FeeManagement';
+import AttendanceManagement   from '../Management/AttendanceManagement';
 
 function StatCard({ icon, label, value, color, change }) {
   return (
@@ -23,10 +26,14 @@ function StatCard({ icon, label, value, color, change }) {
 
 /* ── Dashboard ─────────────────────────────────────────────── */
 function Dashboard() {
-  const totalPaid = fees.filter(f => f.paid).reduce((s, f) => s + f.amount, 0);
-  const totalDue  = fees.filter(f => !f.paid).reduce((s, f) => s + f.amount, 0);
-  const todayAtt  = attendance.filter(a => a.date === '2026-07-31');
+  const { classes, exams, announcements, fees, attendance, staffAttendance } = useData();
+  const { allUsers } = useAuth();
+  const teachers = allUsers.filter(u => u.role === 'teacher');
+  const students = allUsers.filter(u => u.role === 'student');
+  const today    = new Date().toISOString().slice(0, 10);
+  const todayAtt = attendance.filter(a => a.date === today);
   const presentToday = todayAtt.filter(a => a.status === 'Present').length;
+  const totalPaid    = fees.filter(f => f.paid).reduce((s, f) => s + f.amount, 0);
 
   return (
     <div>
@@ -40,11 +47,10 @@ function Dashboard() {
         </div>
       </div>
 
-      {/* Stats */}
       <div className="stat-grid mb-20">
-        <StatCard icon="👩‍🎓" label="Total Students"  value={schoolInfo.totalStudents} color="bg-blue"   change={{ dir:'up', text:'↑ 48 from last year' }} />
-        <StatCard icon="👔"  label="Total Staff"     value={schoolInfo.totalStaff}    color="bg-green"  change={{ dir:'up', text:'↑ 3 new joins' }} />
-        <StatCard icon="🏫"  label="Classes"         value={schoolInfo.totalClasses}  color="bg-purple" />
+        <StatCard icon="👩‍🎓" label="Total Students"  value={students.length}       color="bg-blue"   change={{ dir:'up', text:'↑ 48 from last year' }} />
+        <StatCard icon="👔"  label="Total Staff"     value={schoolInfo.totalStaff}  color="bg-green"  change={{ dir:'up', text:'↑ 3 new joins' }} />
+        <StatCard icon="🏫"  label="Classes"         value={classes.length}         color="bg-purple" />
         <StatCard icon="✅"  label="Attendance Today" value={`${presentToday}/${students.length}`} color="bg-teal" />
         <StatCard icon="💰"  label="Fees Collected"  value={`₹${(totalPaid/1000).toFixed(0)}k`}  color="bg-orange" change={{ dir:'up', text:'₹48k pending' }} />
         <StatCard icon="📋"  label="Upcoming Exams"  value={exams.filter(e=>e.status==='upcoming').length} color="bg-yellow" />
@@ -93,29 +99,24 @@ function Dashboard() {
             <div className="table-wrapper">
               <table>
                 <thead>
-                  <tr>
-                    <th>Name</th>
-                    <th>Subject</th>
-                    <th>Classes</th>
-                    <th>Status</th>
-                  </tr>
+                  <tr><th>Name</th><th>Subject</th><th>Classes</th><th>Status</th></tr>
                 </thead>
                 <tbody>
                   {teachers.map(t => {
-                    const todayStatus = staffAttendance.find(sa => sa.staffId === t.id && sa.date === '2026-08-03');
+                    const s = staffAttendance.find(sa => sa.staffId === t.id && sa.date === today);
                     return (
                       <tr key={t.id}>
                         <td>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <span className={`avatar avatar-sm role-teacher`}>{t.avatar}</span>
+                            <span className="avatar avatar-sm role-teacher">{t.avatar}</span>
                             <span style={{ fontWeight: 500 }}>{t.name}</span>
                           </div>
                         </td>
                         <td>{t.subject}</td>
                         <td>{t.classesHandled?.join(', ')}</td>
                         <td>
-                          <span className={`badge badge-${todayStatus?.status === 'Present' ? 'success' : todayStatus?.status === 'Absent' ? 'danger' : 'warning'}`}>
-                            {todayStatus?.status || 'Unknown'}
+                          <span className={`badge badge-${s?.status === 'Present' ? 'success' : s?.status === 'Absent' ? 'danger' : 'warning'}`}>
+                            {s?.status || 'Unknown'}
                           </span>
                         </td>
                       </tr>
@@ -181,8 +182,9 @@ function Dashboard() {
 
 /* ── Staff Management ──────────────────────────────────────── */
 function StaffManagement() {
+  const { allUsers } = useAuth();
   const [search, setSearch] = useState('');
-  const allStaff = users.filter(u => ['teacher','headmaster'].includes(u.role));
+  const allStaff = allUsers.filter(u => ['teacher','headmaster'].includes(u.role));
   const filtered = allStaff.filter(s =>
     s.name.toLowerCase().includes(search.toLowerCase()) ||
     s.subject?.toLowerCase().includes(search.toLowerCase())
@@ -198,7 +200,6 @@ function StaffManagement() {
         <div className="page-header-actions">
           <input className="form-control" style={{ width: 220 }} placeholder="Search staff…"
             value={search} onChange={e => setSearch(e.target.value)} />
-          <button className="btn btn-primary">+ Add Staff</button>
         </div>
       </div>
 
@@ -206,7 +207,7 @@ function StaffManagement() {
         <div className="table-wrapper">
           <table>
             <thead>
-              <tr><th>Staff Member</th><th>Role</th><th>Subject</th><th>Classes</th><th>Phone</th><th>Email</th><th>Since</th><th>Actions</th></tr>
+              <tr><th>Staff Member</th><th>Role</th><th>Subject</th><th>Classes</th><th>Phone</th><th>Email</th><th>Since</th></tr>
             </thead>
             <tbody>
               {filtered.map(s => (
@@ -226,12 +227,6 @@ function StaffManagement() {
                   <td style={{ fontSize: 12 }}>{s.phone}</td>
                   <td style={{ fontSize: 12 }}>{s.email}</td>
                   <td style={{ fontSize: 12 }}>{s.joinDate}</td>
-                  <td>
-                    <div style={{ display:'flex', gap: 6 }}>
-                      <button className="btn btn-ghost btn-sm">View</button>
-                      <button className="btn btn-outline btn-sm">Edit</button>
-                    </div>
-                  </td>
                 </tr>
               ))}
             </tbody>
@@ -244,8 +239,13 @@ function StaffManagement() {
 
 /* ── All Students ──────────────────────────────────────────── */
 function AllStudents() {
+  const { classes, attendance } = useData();
+  const { allUsers } = useAuth();
   const [search, setSearch] = useState('');
   const [filterClass, setFilterClass] = useState('all');
+  const students = allUsers.filter(u => u.role === 'student');
+  const parents  = allUsers.filter(u => u.role === 'parent');
+
   const all = students.filter(s =>
     s.name.toLowerCase().includes(search.toLowerCase()) &&
     (filterClass === 'all' || s.class === filterClass)
@@ -256,7 +256,7 @@ function AllStudents() {
       <div className="page-header">
         <div className="page-header-left">
           <h1>Student Records</h1>
-          <p>All enrolled students — {schoolInfo.totalStudents} total</p>
+          <p>All enrolled students — {students.length} total</p>
         </div>
         <div className="page-header-actions">
           <input className="form-control" style={{ width: 200 }} placeholder="Search…"
@@ -273,11 +273,11 @@ function AllStudents() {
         <div className="table-wrapper">
           <table>
             <thead>
-              <tr><th>Student</th><th>Roll No</th><th>Class</th><th>DOB</th><th>Parent</th><th>Admission</th><th>Actions</th></tr>
+              <tr><th>Student</th><th>Roll No</th><th>Class</th><th>DOB</th><th>Parent</th><th>Admission</th></tr>
             </thead>
             <tbody>
               {all.map(s => {
-                const parent = users.find(u => u.id === s.parentId);
+                const parent = parents.find(u => u.id === s.parentId);
                 const attRec = attendance.filter(a => a.studentId === s.id);
                 const pct = attRec.length ? Math.round(attRec.filter(a => a.status === 'Present').length / attRec.length * 100) : 0;
                 return (
@@ -296,254 +296,6 @@ function AllStudents() {
                     <td style={{ fontSize: 12 }}>{s.dob}</td>
                     <td style={{ fontSize: 12 }}>{parent?.name || '—'}</td>
                     <td style={{ fontSize: 12 }}>{s.admissionYear}</td>
-                    <td><button className="btn btn-ghost btn-sm">View Profile</button></td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ── Fees & Finance ────────────────────────────────────────── */
-function FeesFinance() {
-  const totalFees   = fees.reduce((s, f) => s + f.amount, 0);
-  const collectedFees = fees.filter(f => f.paid).reduce((s, f) => s + f.amount, 0);
-  const pendingFees = fees.filter(f => !f.paid).reduce((s, f) => s + f.amount, 0);
-
-  return (
-    <div>
-      <div className="page-header">
-        <div className="page-header-left">
-          <h1>Fees & Finance</h1>
-          <p>Track fee collection and pending dues</p>
-        </div>
-      </div>
-
-      <div className="stat-grid mb-20">
-        <StatCard icon="💰" label="Total Fees Due"  value={`₹${(totalFees/1000).toFixed(0)}k`}     color="bg-blue"   />
-        <StatCard icon="✅" label="Fees Collected"  value={`₹${(collectedFees/1000).toFixed(0)}k`} color="bg-green"  change={{ dir:'up', text: `${Math.round(collectedFees/totalFees*100)}% collected` }} />
-        <StatCard icon="⏳" label="Pending Fees"    value={`₹${(pendingFees/1000).toFixed(0)}k`}   color="bg-orange" change={{ dir:'down', text:`${fees.filter(f=>!f.paid).length} records pending` }} />
-      </div>
-
-      <div className="card">
-        <div className="card-header"><div className="card-title">Fee Records</div></div>
-        <div className="table-wrapper">
-          <table>
-            <thead><tr><th>Student</th><th>Term</th><th>Amount</th><th>Status</th><th>Paid Date</th><th>Method</th></tr></thead>
-            <tbody>
-              {fees.map((f, i) => {
-                const s = users.find(u => u.id === f.studentId);
-                return (
-                  <tr key={i}>
-                    <td>
-                      <div style={{ display:'flex', alignItems:'center', gap: 8 }}>
-                        <span className="avatar avatar-sm role-student">{s?.avatar}</span>
-                        {s?.name}
-                      </div>
-                    </td>
-                    <td>{f.term}</td>
-                    <td style={{ fontWeight: 600 }}>₹{f.amount.toLocaleString()}</td>
-                    <td><span className={`badge badge-${f.paid ? 'success' : 'danger'}`}>{f.paid ? 'Paid' : 'Pending'}</span></td>
-                    <td style={{ fontSize: 12 }}>{f.paidDate || '—'}</td>
-                    <td style={{ fontSize: 12 }}>{f.method || '—'}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ── Notices ───────────────────────────────────────────────── */
-function Notices({ canPost = true }) {
-  const [showForm, setShowForm] = useState(false);
-
-  return (
-    <div>
-      <div className="page-header">
-        <div className="page-header-left">
-          <h1>Notices & Announcements</h1>
-          <p>All school communications</p>
-        </div>
-        {canPost && (
-          <div className="page-header-actions">
-            <button className="btn btn-primary" onClick={() => setShowForm(true)}>+ Post Notice</button>
-          </div>
-        )}
-      </div>
-
-      {showForm && (
-        <div className="card mb-20">
-          <div className="card-header">
-            <div className="card-title">New Notice</div>
-            <button className="btn btn-ghost btn-sm" onClick={() => setShowForm(false)}>Cancel</button>
-          </div>
-          <div className="card-body">
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap: 16 }}>
-              <div className="form-group">
-                <label className="form-label">Title</label>
-                <input className="form-control" placeholder="Notice title" />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Priority</label>
-                <select className="form-control"><option>High</option><option>Medium</option><option>Low</option></select>
-              </div>
-            </div>
-            <div className="form-group">
-              <label className="form-label">Audience</label>
-              <select className="form-control"><option>All</option><option>Students</option><option>Parents</option><option>Staff</option></select>
-            </div>
-            <div className="form-group">
-              <label className="form-label">Message</label>
-              <textarea className="form-control" rows={4} placeholder="Notice content…" />
-            </div>
-            <button className="btn btn-primary">Post Notice</button>
-          </div>
-        </div>
-      )}
-
-      <div style={{ display:'grid', gap: 12 }}>
-        {announcements.map(a => (
-          <div key={a.id} className="card">
-            <div className="card-body" style={{ padding: 16 }}>
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap: 12 }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display:'flex', alignItems:'center', gap: 8, marginBottom: 6 }}>
-                    <span style={{ fontSize: 16 }}>📢</span>
-                    <span style={{ fontWeight: 600, fontSize: 14 }}>{a.title}</span>
-                    <span className={`badge badge-${a.priority === 'high' ? 'danger' : a.priority === 'medium' ? 'warning' : 'info'}`}>
-                      {a.priority}
-                    </span>
-                    <span className="badge badge-gray">{a.audience === 'all' ? 'All' : a.audience}</span>
-                  </div>
-                  <p style={{ fontSize: 13, color:'var(--text-secondary)', marginBottom: 8 }}>{a.body}</p>
-                  <div style={{ fontSize: 11, color:'var(--text-muted)' }}>Posted by {a.postedBy} · {a.date}</div>
-                </div>
-                {canPost && (
-                  <div style={{ display:'flex', gap: 6, flexShrink: 0 }}>
-                    <button className="btn btn-ghost btn-sm">Edit</button>
-                    <button className="btn btn-danger btn-sm">Delete</button>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/* ── Holiday Calendar ──────────────────────────────────────── */
-function HolidayCalendar({ canEdit = false }) {
-  const typeColors = { National: 'bg-red', Festival: 'bg-orange', Regional: 'bg-purple' };
-  const badgeColors = { National: 'badge-danger', Festival: 'badge-warning', Regional: 'badge-purple' };
-
-  return (
-    <div>
-      <div className="page-header">
-        <div className="page-header-left">
-          <h1>Holiday Calendar 2026-27</h1>
-          <p>{holidays.length} holidays this academic year</p>
-        </div>
-        {canEdit && (
-          <button className="btn btn-primary">+ Add Holiday</button>
-        )}
-      </div>
-
-      <div className="dashboard-grid grid-2">
-        <div className="card" style={{ gridColumn: 'span 2' }}>
-          <div className="table-wrapper">
-            <table>
-              <thead><tr><th>#</th><th>Date</th><th>Holiday</th><th>Type</th><th>Description</th></tr></thead>
-              <tbody>
-                {holidays.map(h => (
-                  <tr key={h.id}>
-                    <td style={{ color:'var(--text-muted)', fontSize: 12 }}>{h.id}</td>
-                    <td style={{ fontWeight: 500 }}>
-                      {new Date(h.date).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' })}
-                      <div style={{ fontSize: 11, color:'var(--text-muted)' }}>
-                        {new Date(h.date).toLocaleDateString('en-IN', { weekday:'long' })}
-                      </div>
-                    </td>
-                    <td style={{ fontWeight: 600 }}>{h.name}</td>
-                    <td><span className={`badge ${badgeColors[h.type]}`}>{h.type}</span></td>
-                    <td style={{ fontSize: 12, color:'var(--text-secondary)' }}>{h.description}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ── Attendance (Principal view) ────────────────────────────── */
-function AttendanceOverview() {
-  const studentAtt = {};
-  students.forEach(s => {
-    const recs = attendance.filter(a => a.studentId === s.id);
-    const present = recs.filter(a => a.status === 'Present').length;
-    const absent  = recs.filter(a => a.status === 'Absent').length;
-    const late    = recs.filter(a => a.status === 'Late').length;
-    const total   = recs.length;
-    studentAtt[s.id] = { present, absent, late, total, pct: total ? Math.round((present + late * 0.5) / total * 100) : 0 };
-  });
-
-  return (
-    <div>
-      <div className="page-header">
-        <div className="page-header-left">
-          <h1>Attendance Overview</h1>
-          <p>Student attendance records for the current month</p>
-        </div>
-      </div>
-
-      <div className="stat-grid mb-20">
-        <StatCard icon="✅" label="Avg Attendance"  value="89.3%"   color="bg-green"  />
-        <StatCard icon="❌" label="Avg Absent Rate" value="8.2%"    color="bg-red"    />
-        <StatCard icon="⚠" label="Below 75%"       value="12"      color="bg-orange" />
-      </div>
-
-      <div className="card">
-        <div className="card-header"><div className="card-title">Student Attendance Summary</div></div>
-        <div className="table-wrapper">
-          <table>
-            <thead><tr><th>Student</th><th>Class</th><th>Present</th><th>Absent</th><th>Late</th><th>Total Days</th><th>Attendance %</th></tr></thead>
-            <tbody>
-              {students.map(s => {
-                const a = studentAtt[s.id] || {};
-                const low = a.pct < 75;
-                return (
-                  <tr key={s.id}>
-                    <td>
-                      <div style={{ display:'flex', alignItems:'center', gap: 8 }}>
-                        <span className="avatar avatar-sm role-student">{s.avatar}</span>
-                        {s.name}
-                      </div>
-                    </td>
-                    <td>{s.class}</td>
-                    <td style={{ color:'var(--success)', fontWeight: 600 }}>{a.present}</td>
-                    <td style={{ color:'var(--danger)',  fontWeight: 600 }}>{a.absent}</td>
-                    <td style={{ color:'var(--warning)', fontWeight: 600 }}>{a.late}</td>
-                    <td>{a.total}</td>
-                    <td>
-                      <div style={{ display:'flex', alignItems:'center', gap: 8 }}>
-                        <div style={{ flex: 1, height: 6, background:'var(--border)', borderRadius: 3, overflow:'hidden' }}>
-                          <div style={{ height:'100%', width:`${a.pct}%`, background: low ? 'var(--danger)' : 'var(--success)', borderRadius: 3 }} />
-                        </div>
-                        <span style={{ fontSize: 12, fontWeight: 600, color: low ? 'var(--danger)' : 'var(--success)', minWidth: 38 }}>{a.pct}%</span>
-                      </div>
-                    </td>
                   </tr>
                 );
               })}
@@ -569,7 +321,7 @@ function Reports() {
           { icon:'💰', title:'Fee Collection Report',desc:'Term-wise fee collection and pending dues', color:'bg-orange' },
           { icon:'👔', title:'Staff Report',         desc:'Teaching hours, leave records, performance', color:'bg-purple' },
           { icon:'📋', title:'Exam Results Report',  desc:'Exam-wise results and grade distribution', color:'bg-teal' },
-          { icon:'🏆', title:'Topper\'s Report',      desc:'Top performers across all classes', color:'bg-yellow' },
+          { icon:'🏆', title:'Topper\'s Report',     desc:'Top performers across all classes', color:'bg-yellow' },
         ].map(r => (
           <div key={r.title} className="stat-card" style={{ flexDirection:'column', alignItems:'flex-start', cursor:'pointer' }}>
             <div className={`stat-icon ${r.color}`} style={{ marginBottom: 12 }}>{r.icon}</div>
@@ -583,112 +335,14 @@ function Reports() {
   );
 }
 
-/* ── Exam Management ───────────────────────────────────────── */
-function ExamManagement() {
-  return (
-    <div>
-      <div className="page-header">
-        <div className="page-header-left"><h1>Exam Management</h1></div>
-        <button className="btn btn-primary">+ Schedule Exam</button>
-      </div>
-      <div className="card">
-        <div className="table-wrapper">
-          <table>
-            <thead><tr><th>Exam</th><th>Subject</th><th>Class</th><th>Date</th><th>Time</th><th>Duration</th><th>Max Marks</th><th>Room</th><th>Status</th></tr></thead>
-            <tbody>
-              {exams.map(e => (
-                <tr key={e.id}>
-                  <td style={{ fontWeight: 500 }}>{e.name}</td>
-                  <td>{e.subject}</td>
-                  <td><span className="badge badge-info">{e.class}</span></td>
-                  <td>{e.date}</td>
-                  <td>{e.time}</td>
-                  <td>{e.duration}</td>
-                  <td>{e.maxMarks}</td>
-                  <td>{e.room}</td>
-                  <td>
-                    <span className={`badge badge-${e.status === 'upcoming' ? 'warning' : 'success'}`}>
-                      {e.status}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ── Classes ───────────────────────────────────────────────── */
-function ClassesView() {
-  return (
-    <div>
-      <div className="page-header">
-        <div className="page-header-left"><h1>Classes</h1></div>
-        <button className="btn btn-primary">+ Add Class</button>
-      </div>
-      <div className="dashboard-grid grid-3">
-        {classes.map(cls => {
-          const ct = users.find(u => u.id === cls.classTeacherId);
-          return (
-            <div key={cls.id} className="card" style={{ cursor:'pointer' }}>
-              <div className="card-body">
-                <div style={{ display:'flex', alignItems:'center', gap: 12, marginBottom: 14 }}>
-                  <div style={{ width: 48, height: 48, borderRadius: 12, background:'#ebf8ff', display:'grid', placeItems:'center', fontSize: 22 }}>🏫</div>
-                  <div>
-                    <div style={{ fontWeight: 700, fontSize: 18 }}>Class {cls.name}</div>
-                    <div style={{ fontSize: 12, color:'var(--text-muted)' }}>{cls.room}</div>
-                  </div>
-                </div>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap: 8, marginBottom: 12 }}>
-                  <div style={{ background:'var(--bg-app)', borderRadius: 8, padding:'8px 12px' }}>
-                    <div style={{ fontSize: 11, color:'var(--text-muted)' }}>Strength</div>
-                    <div style={{ fontWeight: 700, fontSize: 18 }}>{cls.strength}</div>
-                  </div>
-                  <div style={{ background:'var(--bg-app)', borderRadius: 8, padding:'8px 12px' }}>
-                    <div style={{ fontSize: 11, color:'var(--text-muted)' }}>Grade</div>
-                    <div style={{ fontWeight: 700, fontSize: 18 }}>{cls.grade}</div>
-                  </div>
-                </div>
-                <div style={{ display:'flex', alignItems:'center', gap: 8 }}>
-                  <span className="avatar avatar-sm role-teacher">{ct?.avatar}</span>
-                  <div>
-                    <div style={{ fontSize: 12, fontWeight: 500 }}>{ct?.name}</div>
-                    <div style={{ fontSize: 11, color:'var(--text-muted)' }}>Class Teacher</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-/* ── Messages ──────────────────────────────────────────────── */
-function Messages() {
-  return (
-    <div>
-      <div className="page-header">
-        <div className="page-header-left"><h1>Messages</h1></div>
-        <button className="btn btn-primary">+ Compose</button>
-      </div>
-      <div className="card">
-        <div style={{ padding: 24, textAlign:'center', color:'var(--text-muted)' }}>
-          <div style={{ fontSize: 48, marginBottom: 12 }}>💬</div>
-          <h3 style={{ color:'var(--text-secondary)', marginBottom: 6 }}>Internal Messaging</h3>
-          <p style={{ fontSize: 13 }}>View and send messages to staff, students, and parents.</p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 /* ── Analytics ─────────────────────────────────────────────── */
 function Analytics() {
+  const { notes, homework } = useData();
+  const { allUsers } = useAuth();
+  const results2 = results;
+  const students = allUsers.filter(u => u.role === 'student');
+  const graded   = results2.filter(r => r.marksObtained >= 80).length;
+
   return (
     <div>
       <div className="page-header">
@@ -696,9 +350,9 @@ function Analytics() {
       </div>
       <div className="stat-grid mb-20">
         <StatCard icon="📈" label="Pass Rate"         value="94.2%" color="bg-green" change={{ dir:'up', text:'↑ 2.1% vs last year' }} />
-        <StatCard icon="🏆" label="Distinction (90+)" value="127"   color="bg-yellow" />
-        <StatCard icon="📚" label="Notes Uploaded"    value="148"   color="bg-blue" />
-        <StatCard icon="📝" label="Homework Given"    value="312"   color="bg-purple" />
+        <StatCard icon="🏆" label="Distinction (90+)" value={graded}   color="bg-yellow" />
+        <StatCard icon="📚" label="Notes Uploaded"    value={notes.length}   color="bg-blue" />
+        <StatCard icon="📝" label="Homework Given"    value={homework.length} color="bg-purple" />
       </div>
       <div className="dashboard-grid grid-2">
         <div className="card">
@@ -740,21 +394,42 @@ function Analytics() {
   );
 }
 
+/* ── Messages ──────────────────────────────────────────────── */
+function Messages() {
+  return (
+    <div>
+      <div className="page-header">
+        <div className="page-header-left"><h1>Messages</h1></div>
+        <button className="btn btn-primary">+ Compose</button>
+      </div>
+      <div className="card">
+        <div style={{ padding: 24, textAlign:'center', color:'var(--text-muted)' }}>
+          <div style={{ fontSize: 48, marginBottom: 12 }}>💬</div>
+          <h3 style={{ color:'var(--text-secondary)', marginBottom: 6 }}>Internal Messaging</h3>
+          <p style={{ fontSize: 13 }}>View and send messages to staff, students, and parents.</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ── Root ──────────────────────────────────────────────────── */
 export default function PrincipalDashboard({ activeTab }) {
   const views = {
-    dashboard:  <Dashboard />,
-    analytics:  <Analytics />,
-    staff:      <StaffManagement />,
-    students:   <AllStudents />,
-    classes:    <ClassesView />,
-    fees:       <FeesFinance />,
-    exams:      <ExamManagement />,
-    attendance: <AttendanceOverview />,
-    holidays:   <HolidayCalendar canEdit />,
-    notices:    <Notices canPost />,
-    messages:   <Messages />,
-    reports:    <Reports />,
+    dashboard:         <Dashboard />,
+    analytics:         <Analytics />,
+    registration:      <Registration />,
+    staff:             <StaffManagement />,
+    students:          <AllStudents />,
+    classes:           <ClassManagement />,
+    fees:              <FeeManagement />,
+    exams:             <ExamManagement />,
+    'question-papers': <QuestionPaperManagement />,
+    attendance:        <AttendanceManagement />,
+    holidays:          <HolidayManagement canEdit />,
+    notices:           <NoticeManagement canPost />,
+    messages:          <Messages />,
+    reports:           <Reports />,
   };
   return views[activeTab] || <Dashboard />;
 }
