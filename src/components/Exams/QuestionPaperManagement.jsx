@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { questionPapers as initialPapers, exams, classes, users, results as initialResults, schoolInfo } from '../../data/mockData';
+import { useData } from '../../context/DataContext';
+import * as academicsApi from '../../api/academicsApi';
+import * as peopleApi from '../../api/peopleApi';
+import { schoolInfo } from '../../data/mockData';
 
-const SUBJECTS    = ['Mathematics', 'Science', 'English', 'Hindi', 'History', 'Geography', 'Computer', 'PE', 'Drawing'];
-const CLASS_NAMES = classes.map(c => c.name);
+const SUBJECTS = ['Mathematics', 'Science', 'English', 'Hindi', 'History', 'Geography', 'Computer', 'PE', 'Drawing'];
 
 const PAPER_TYPES = [
   {
@@ -62,24 +64,18 @@ const ALL_Q_TYPES = [
   { value: 'MatchFollowing', label: 'Match the Following', desc: 'Match two columns'  },
 ];
 
-function gradeFromPct(pct) {
-  if (pct >= 90) return 'A+';
-  if (pct >= 80) return 'A';
-  if (pct >= 70) return 'B+';
-  if (pct >= 60) return 'B';
-  if (pct >= 50) return 'C';
-  if (pct >= 33) return 'D';
-  return 'F';
+function classLabel(classId, classes) {
+  const cls = classes.find(c => String(c.id) === String(classId));
+  return cls ? `${cls.gradeLevel}${cls.section}` : (classId ?? '—');
 }
 
-function remarkFromPct(pct) {
-  if (pct >= 90) return 'Outstanding';
-  if (pct >= 80) return 'Excellent';
-  if (pct >= 70) return 'Very Good';
-  if (pct >= 60) return 'Good';
-  if (pct >= 50) return 'Satisfactory';
-  if (pct >= 33) return 'Needs Improvement';
-  return 'Fail';
+function gradePreview(pct) {
+  if (pct >= 90) return 'A+';
+  if (pct >= 80) return 'A';
+  if (pct >= 70) return 'B';
+  if (pct >= 60) return 'C';
+  if (pct >= 50) return 'D';
+  return 'F';
 }
 
 // ─── Paper Type Picker ────────────────────────────────────────────────────────
@@ -141,7 +137,7 @@ function PaperTypePicker({ onSelect, onBack }) {
 }
 
 // ─── Paper List ───────────────────────────────────────────────────────────────
-function PaperList({ papers, onView, onEdit, onDelete, onCreateResult, currentUser }) {
+function PaperList({ papers, classes, onView, onCreate, onCreateResult, currentUser }) {
   const [search, setSearch]               = useState('');
   const [filterClass, setFilterClass]     = useState('all');
   const [filterSubject, setFilterSubject] = useState('all');
@@ -149,15 +145,16 @@ function PaperList({ papers, onView, onEdit, onDelete, onCreateResult, currentUs
   const [filterType, setFilterType]       = useState('all');
 
   const canManage = ['principal', 'headmaster', 'teacher'].includes(currentUser?.role);
-  const getPTInfo = v  => PAPER_TYPES.find(t => t.value === (v || 'complete')) || PAPER_TYPES[0];
-  const totalQ    = p  => p.sections.reduce((s, sec) => s + sec.questions.length, 0);
+  const getPTInfo = p => PAPER_TYPES.find(t => t.value === (p.content?.paperType || 'complete')) || PAPER_TYPES[0];
+  const totalQ    = p => (p.content?.sections || []).reduce((s, sec) => s + sec.questions.length, 0);
+  const statusOf  = p => p.content?.status || 'draft';
 
   const filtered = papers.filter(p => {
     const ms  = !search       || p.title.toLowerCase().includes(search.toLowerCase()) || p.subject.toLowerCase().includes(search.toLowerCase());
-    const mc  = filterClass   === 'all' || p.className                  === filterClass;
-    const msu = filterSubject === 'all' || p.subject                    === filterSubject;
-    const mst = filterStatus  === 'all' || p.status                     === filterStatus;
-    const mtp = filterType    === 'all' || (p.paperType || 'complete')  === filterType;
+    const mc  = filterClass   === 'all' || String(p.classId)                 === filterClass;
+    const msu = filterSubject === 'all' || p.subject                         === filterSubject;
+    const mst = filterStatus  === 'all' || statusOf(p)                       === filterStatus;
+    const mtp = filterType    === 'all' || (p.content?.paperType || 'complete') === filterType;
     return ms && mc && msu && mst && mtp;
   });
 
@@ -169,16 +166,16 @@ function PaperList({ papers, onView, onEdit, onDelete, onCreateResult, currentUs
           <p>Create, manage, and view question papers for all exams</p>
         </div>
         {canManage && (
-          <button className="btn btn-primary" onClick={() => onEdit(null)}>+ Create Paper</button>
+          <button className="btn btn-primary" onClick={onCreate}>+ Create Paper</button>
         )}
       </div>
 
       <div className="stat-grid mb-20" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))' }}>
         {[
-          { label: 'Total Papers',    value: papers.length,                                       icon: '📄', color: 'bg-blue'   },
-          { label: 'Published',       value: papers.filter(p => p.status === 'published').length, icon: '✅', color: 'bg-green'  },
-          { label: 'Drafts',          value: papers.filter(p => p.status === 'draft').length,     icon: '✏️', color: 'bg-orange' },
-          { label: 'Total Questions', value: papers.reduce((s, p) => s + totalQ(p), 0),           icon: '❓', color: 'bg-purple' },
+          { label: 'Total Papers',    value: papers.length,                                            icon: '📄', color: 'bg-blue'   },
+          { label: 'Published',       value: papers.filter(p => statusOf(p) === 'published').length,   icon: '✅', color: 'bg-green'  },
+          { label: 'Drafts',          value: papers.filter(p => statusOf(p) === 'draft').length,        icon: '✏️', color: 'bg-orange' },
+          { label: 'Total Questions', value: papers.reduce((s, p) => s + totalQ(p), 0),                 icon: '❓', color: 'bg-purple' },
         ].map(s => (
           <div key={s.label} className="stat-card">
             <div className={`stat-icon ${s.color}`}>{s.icon}</div>
@@ -192,7 +189,7 @@ function PaperList({ papers, onView, onEdit, onDelete, onCreateResult, currentUs
           <input className="form-control" style={{ maxWidth: 200 }} placeholder="Search papers…" value={search} onChange={e => setSearch(e.target.value)} />
           <select className="form-control" style={{ maxWidth: 130 }} value={filterClass} onChange={e => setFilterClass(e.target.value)}>
             <option value="all">All Classes</option>
-            {CLASS_NAMES.map(c => <option key={c}>{c}</option>)}
+            {classes.map(c => <option key={c.id} value={String(c.id)}>Class {c.gradeLevel}{c.section}</option>)}
           </select>
           <select className="form-control" style={{ maxWidth: 150 }} value={filterSubject} onChange={e => setFilterSubject(e.target.value)}>
             <option value="all">All Subjects</option>
@@ -221,7 +218,7 @@ function PaperList({ papers, onView, onEdit, onDelete, onCreateResult, currentUs
               {filtered.length === 0 ? (
                 <tr><td colSpan={9} style={{ textAlign: 'center', padding: 32, color: 'var(--text-muted)' }}>No papers found</td></tr>
               ) : filtered.map(p => {
-                const pti = getPTInfo(p.paperType);
+                const pti = getPTInfo(p);
                 return (
                   <tr key={p.id}>
                     <td style={{ fontWeight: 600, fontSize: 13 }}>{p.title}</td>
@@ -230,21 +227,19 @@ function PaperList({ papers, onView, onEdit, onDelete, onCreateResult, currentUs
                         {pti.icon} {pti.label}
                       </span>
                     </td>
-                    <td><span className="badge badge-info">{p.className}</span></td>
+                    <td><span className="badge badge-info">{classLabel(p.classId, classes)}</span></td>
                     <td>{p.subject}</td>
-                    <td style={{ fontWeight: 600 }}>{p.maxMarks}</td>
-                    <td>{p.duration}</td>
+                    <td style={{ fontWeight: 600 }}>{p.content?.maxMarks ?? '—'}</td>
+                    <td>{p.content?.duration ?? '—'}</td>
                     <td>
                       <span className="badge badge-gray">{totalQ(p)} Qs</span>
-                      <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 4 }}>{p.sections.length} sec</span>
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 4 }}>{(p.content?.sections || []).length} sec</span>
                     </td>
-                    <td><span className={`badge ${p.status === 'published' ? 'badge-success' : 'badge-warning'}`}>{p.status}</span></td>
+                    <td><span className={`badge ${statusOf(p) === 'published' ? 'badge-success' : 'badge-warning'}`}>{statusOf(p)}</span></td>
                     <td>
                       <div style={{ display: 'flex', gap: 4 }}>
                         <button className="btn btn-ghost btn-sm" onClick={() => onView(p)}>View</button>
-                        {canManage && <button className="btn btn-ghost btn-sm" onClick={() => onEdit(p)}>Edit</button>}
-                        {canManage && p.status === 'published' && <button className="btn btn-ghost btn-sm" style={{ color: 'var(--success)' }} onClick={() => onCreateResult(p)}>Results</button>}
-                        {canManage && <button className="btn btn-danger btn-sm" onClick={() => onDelete(p.id)}>✕</button>}
+                        {canManage && statusOf(p) === 'published' && <button className="btn btn-ghost btn-sm" style={{ color: 'var(--success)' }} onClick={() => onCreateResult(p)}>Results</button>}
                       </div>
                     </td>
                   </tr>
@@ -259,9 +254,10 @@ function PaperList({ papers, onView, onEdit, onDelete, onCreateResult, currentUs
 }
 
 // ─── Paper Viewer ─────────────────────────────────────────────────────────────
-function PaperViewer({ paper, onBack }) {
+function PaperViewer({ paper, classes, onBack }) {
   const qLabels = ['a', 'b', 'c', 'd'];
-  const ptInfo  = PAPER_TYPES.find(t => t.value === (paper.paperType || 'complete')) || PAPER_TYPES[0];
+  const content = paper.content || {};
+  const ptInfo  = PAPER_TYPES.find(t => t.value === (content.paperType || 'complete')) || PAPER_TYPES[0];
   let globalQ   = 0;
 
   return (
@@ -288,19 +284,19 @@ function PaperViewer({ paper, onBack }) {
           <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{schoolInfo.address}</div>
           <div style={{ fontWeight: 600, fontSize: 16, marginTop: 8 }}>{paper.title}</div>
           <div className="qp-meta">
-            <span>Class: <strong>{paper.className}</strong></span>
+            <span>Class: <strong>{classLabel(paper.classId, classes)}</strong></span>
             <span>Subject: <strong>{paper.subject}</strong></span>
-            <span>Academic Year: <strong>{paper.academicYear}</strong></span>
+            <span>Academic Year: <strong>{content.academicYear}</strong></span>
           </div>
           <div className="qp-meta" style={{ marginTop: 6 }}>
-            <span>Max. Marks: <strong>{paper.maxMarks}</strong></span>
-            <span>Time Allowed: <strong>{paper.duration}</strong></span>
+            <span>Max. Marks: <strong>{content.maxMarks}</strong></span>
+            <span>Time Allowed: <strong>{content.duration}</strong></span>
             <span>Date: <strong>________________</strong></span>
           </div>
         </div>
 
         <div className="qp-instructions">
-          <strong>General Instructions:</strong> {paper.instructions || 'Read all questions carefully before answering.'}
+          <strong>General Instructions:</strong> {content.instructions || 'Read all questions carefully before answering.'}
         </div>
 
         <div style={{ display: 'flex', gap: 32, marginBottom: 20, fontSize: 13 }}>
@@ -309,7 +305,7 @@ function PaperViewer({ paper, onBack }) {
           <span>Section: _______</span>
         </div>
 
-        {paper.sections.map(sec => (
+        {(content.sections || []).map(sec => (
           <div key={sec.id} className="qp-section">
             <div className="qp-section-title">{sec.title}</div>
             {sec.sectionInstructions && (
@@ -377,7 +373,7 @@ function PaperViewer({ paper, onBack }) {
         ))}
 
         <div style={{ marginTop: 24, textAlign: 'center', fontSize: 12, color: 'var(--text-muted)', borderTop: '1px solid var(--border)', paddingTop: 16 }}>
-          — End of Question Paper — Total Marks: {paper.maxMarks}
+          — End of Question Paper — Total Marks: {content.maxMarks}
         </div>
       </div>
     </div>
@@ -385,9 +381,8 @@ function PaperViewer({ paper, onBack }) {
 }
 
 // ─── Paper Editor ─────────────────────────────────────────────────────────────
-function PaperEditor({ paper, paperType: paperTypeProp, onSave, onBack, currentUser }) {
-  const isNew      = !paper;
-  const ptValue    = paper?.paperType || paperTypeProp || 'complete';
+function PaperEditor({ paperType: paperTypeProp, onSave, onBack, classes, exams }) {
+  const ptValue    = paperTypeProp || 'complete';
   const ptInfo     = PAPER_TYPES.find(p => p.value === ptValue) || PAPER_TYPES[0];
   const allowedQTs = ptInfo.allowedTypes
     ? ALL_Q_TYPES.filter(t => ptInfo.allowedTypes.includes(t.value))
@@ -401,8 +396,8 @@ function PaperEditor({ paper, paperType: paperTypeProp, onSave, onBack, currentU
     return 'Section A';
   };
 
-  const [form, setForm] = useState(() => paper ? { ...paper } : {
-    title: '', examId: '', className: '', subject: '',
+  const [form, setForm] = useState(() => ({
+    title: '', examId: '', classId: '', subject: '', fileUrl: '',
     academicYear: '2026-27',
     maxMarks: ptInfo.defaults?.maxMarks ?? 100,
     duration: ptInfo.defaults?.duration ?? '3 hrs',
@@ -410,9 +405,11 @@ function PaperEditor({ paper, paperType: paperTypeProp, onSave, onBack, currentU
     status: 'draft',
     paperType: ptValue,
     sections: [{ id: 1, title: sectionLabel(), sectionInstructions: '', questions: [] }],
-  });
+  }));
 
-  const [errors, setErrors] = useState({});
+  const [errors, setErrors]         = useState({});
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
   const sf = (field, val) => setForm(f => ({ ...f, [field]: val }));
 
   const addSection = () => {
@@ -502,20 +499,34 @@ function PaperEditor({ paper, paperType: paperTypeProp, onSave, onBack, currentU
 
   const validate = () => {
     const e = {};
-    if (!form.title.trim())    e.title     = 'Title is required';
-    if (!form.className)       e.className = 'Class is required';
-    if (!form.subject)         e.subject   = 'Subject is required';
-    if (!form.maxMarks)        e.maxMarks  = 'Max marks required';
-    if (!form.duration.trim()) e.duration  = 'Duration is required';
-    if (!form.sections.length) e.sections  = 'Add at least one section';
+    if (!form.title.trim())    e.title    = 'Title is required';
+    if (!form.classId)         e.classId  = 'Class is required';
+    if (!form.subject)         e.subject  = 'Subject is required';
+    if (!form.maxMarks)        e.maxMarks = 'Max marks required';
+    if (!form.duration.trim()) e.duration = 'Duration is required';
+    if (!form.sections.length) e.sections = 'Add at least one section';
     setErrors(e);
     return Object.keys(e).length === 0;
   };
 
-  const doSave = (status) => {
+  const doSave = async (status) => {
     if (!validate()) return;
-    const now = new Date().toISOString().slice(0, 10);
-    onSave({ ...form, status, maxMarks: Number(form.maxMarks), createdBy: currentUser?.name || 'Unknown', createdDate: isNew ? now : form.createdDate });
+    const { title, examId, classId, subject, fileUrl, ...content } = form;
+    setSubmitting(true);
+    setSubmitError('');
+    try {
+      await onSave({
+        classId: Number(classId),
+        subject,
+        title,
+        examId: examId ? Number(examId) : null,
+        fileUrl: fileUrl || null,
+        content: { ...content, status, maxMarks: Number(form.maxMarks) },
+      });
+    } catch (err) {
+      setSubmitError(err.message || 'Failed to save question paper');
+      setSubmitting(false);
+    }
   };
 
   const addBtnLabel = defaultQType === 'MatchFollowing' ? '+ Add Matching Set' :
@@ -525,20 +536,22 @@ function PaperEditor({ paper, paperType: paperTypeProp, onSave, onBack, currentU
     <div>
       <div className="page-header">
         <div className="page-header-left">
-          <h1>{isNew ? 'Create Question Paper' : 'Edit Question Paper'}</h1>
+          <h1>Create Question Paper</h1>
           <p>
             <span style={{ padding: '2px 10px', borderRadius: 12, background: `${ptInfo.color}18`, color: ptInfo.color, fontWeight: 700, marginRight: 8, fontSize: 12 }}>
               {ptInfo.icon} {ptInfo.label}
             </span>
-            {isNew ? 'Step 2 of 2 — Fill in paper details and add questions' : `Editing: ${paper.title}`}
+            Step 2 of 2 — Fill in paper details and add questions
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button className="btn btn-ghost" onClick={onBack}>Cancel</button>
-          <button className="btn btn-ghost" onClick={() => doSave('draft')}>Save as Draft</button>
-          <button className="btn btn-primary" onClick={() => doSave('published')}>Publish Paper</button>
+          <button className="btn btn-ghost" onClick={() => doSave('draft')} disabled={submitting}>Save as Draft</button>
+          <button className="btn btn-primary" onClick={() => doSave('published')} disabled={submitting}>Publish Paper</button>
         </div>
       </div>
+
+      {submitError && <div className="alert alert-danger mb-20">{submitError}</div>}
 
       {/* Paper Information */}
       <div className="card mb-20">
@@ -554,16 +567,16 @@ function PaperEditor({ paper, paperType: paperTypeProp, onSave, onBack, currentU
               <label className="reg-label">Link to Exam (optional)</label>
               <select className="form-control" value={form.examId} onChange={e => sf('examId', e.target.value)}>
                 <option value="">None</option>
-                {exams.map(ex => <option key={ex.id} value={ex.id}>{ex.name} – {ex.subject} ({ex.class})</option>)}
+                {exams.map(ex => <option key={ex.id} value={ex.id}>{ex.subject} — Class {classLabel(ex.classId, classes)} ({ex.examDate})</option>)}
               </select>
             </div>
             <div className="reg-form-group">
               <label className="reg-label required">Class</label>
-              <select className={`form-control${errors.className ? ' input-error' : ''}`} value={form.className} onChange={e => sf('className', e.target.value)}>
+              <select className={`form-control${errors.classId ? ' input-error' : ''}`} value={form.classId} onChange={e => sf('classId', e.target.value)}>
                 <option value="">Select class</option>
-                {CLASS_NAMES.map(c => <option key={c}>{c}</option>)}
+                {classes.map(c => <option key={c.id} value={c.id}>Class {c.gradeLevel}{c.section}</option>)}
               </select>
-              {errors.className && <span className="reg-field-error">{errors.className}</span>}
+              {errors.classId && <span className="reg-field-error">{errors.classId}</span>}
             </div>
             <div className="reg-form-group">
               <label className="reg-label required">Subject</label>
@@ -586,6 +599,10 @@ function PaperEditor({ paper, paperType: paperTypeProp, onSave, onBack, currentU
               <label className="reg-label required">Max Marks</label>
               <input type="number" className={`form-control${errors.maxMarks ? ' input-error' : ''}`} value={form.maxMarks} onChange={e => sf('maxMarks', e.target.value)} min="1" />
               {errors.maxMarks && <span className="reg-field-error">{errors.maxMarks}</span>}
+            </div>
+            <div className="reg-form-group">
+              <label className="reg-label">Attachment URL (optional)</label>
+              <input className="form-control" value={form.fileUrl} onChange={e => sf('fileUrl', e.target.value)} placeholder="https://…" />
             </div>
             <div className="reg-form-group" style={{ gridColumn: '1 / -1' }}>
               <label className="reg-label">General Instructions</label>
@@ -779,55 +796,73 @@ function PaperEditor({ paper, paperType: paperTypeProp, onSave, onBack, currentU
 
       <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 24 }}>
         <button className="btn btn-ghost" onClick={onBack}>Cancel</button>
-        <button className="btn btn-ghost" onClick={() => doSave('draft')}>Save as Draft</button>
-        <button className="btn btn-primary" onClick={() => doSave('published')}>Publish Paper</button>
+        <button className="btn btn-ghost" onClick={() => doSave('draft')} disabled={submitting}>Save as Draft</button>
+        <button className="btn btn-primary" onClick={() => doSave('published')} disabled={submitting}>Publish Paper</button>
       </div>
     </div>
   );
 }
 
 // ─── Results Entry ────────────────────────────────────────────────────────────
-function ResultsEntry({ paper, existingResults, onSave, onBack }) {
-  const classStudents = users.filter(u => u.role === 'student' && u.class === paper.className);
+function ResultsEntry({ paper, exam, students, existingResults, classes, onSave, onBack }) {
+  const classStudents = students.filter(s => String(s.classId) === String(paper.classId));
+  const maxMarks = exam?.maxMarks ?? paper.content?.maxMarks ?? 100;
+
   const initMarks = () => {
     const m = {};
     classStudents.forEach(s => {
-      const existing = existingResults.find(r => r.studentId === s.id && r.subject === paper.subject);
+      const existing = existingResults.find(r => r.studentId === s.id && r.examId === paper.examId);
       m[s.id] = existing ? String(existing.marksObtained) : '';
     });
     return m;
   };
-  const [marks, setMarks] = useState(initMarks);
-  const [saved, setSaved] = useState(false);
+  const [marks, setMarks]   = useState(initMarks);
+  const [saved, setSaved]   = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const setMark = (sid, val) => {
     const n = Number(val);
-    if (val === '' || (n >= 0 && n <= paper.maxMarks)) setMarks(m => ({ ...m, [sid]: val }));
+    if (val === '' || (n >= 0 && n <= maxMarks)) setMarks(m => ({ ...m, [sid]: val }));
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const newResults = classStudents
       .filter(s => marks[s.id] !== '')
-      .map(s => {
-        const mo  = Number(marks[s.id]);
-        const pct = Math.round((mo / paper.maxMarks) * 100);
-        return { studentId: s.id, examId: paper.examId || null, subject: paper.subject, marksObtained: mo, maxMarks: paper.maxMarks, percentage: pct, grade: gradeFromPct(pct), remarks: remarkFromPct(pct), paperId: paper.id };
-      });
-    onSave(newResults);
-    setSaved(true);
-    setTimeout(() => { setSaved(false); onBack(); }, 1500);
+      .map(s => ({ studentId: s.id, examId: paper.examId, subject: paper.subject, marksObtained: Number(marks[s.id]), maxMarks }));
+    setSaving(true);
+    try {
+      await onSave(newResults);
+      setSaved(true);
+      setTimeout(() => { setSaved(false); onBack(); }, 1200);
+    } finally {
+      setSaving(false);
+    }
   };
+
+  if (!paper.examId) {
+    return (
+      <div>
+        <div className="page-header">
+          <div className="page-header-left"><h1>Enter Results</h1></div>
+          <button className="btn btn-ghost" onClick={onBack}>← Back</button>
+        </div>
+        <div className="card"><div className="card-body">
+          This paper isn't linked to an exam, so results can't be recorded against it. Create a new paper and link it to an exam to enter results.
+        </div></div>
+      </div>
+    );
+  }
 
   return (
     <div>
       <div className="page-header">
         <div className="page-header-left">
           <h1>Enter Results</h1>
-          <p>{paper.title} · Class {paper.className} · Max Marks: {paper.maxMarks}</p>
+          <p>{paper.title} · Class {classLabel(paper.classId, classes)} · Max Marks: {maxMarks}</p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button className="btn btn-ghost" onClick={onBack}>← Back</button>
-          <button className="btn btn-primary" onClick={handleSave}>Save Results</button>
+          <button className="btn btn-primary" onClick={handleSave} disabled={saving}>{saving ? 'Saving…' : 'Save Results'}</button>
         </div>
       </div>
 
@@ -836,35 +871,27 @@ function ResultsEntry({ paper, existingResults, onSave, onBack }) {
       <div className="card">
         <div className="card-header">
           <div className="card-title">Marks Entry – {paper.subject}</div>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Max: {paper.maxMarks} | Enter marks for each student below</div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Max: {maxMarks} | Enter marks for each student below</div>
         </div>
         <div className="table-wrapper">
           <table className="results-table">
             <thead>
-              <tr><th>#</th><th>Student</th><th>Roll No</th><th>Marks Obtained (/{paper.maxMarks})</th><th>Percentage</th><th>Grade</th><th>Remarks</th></tr>
+              <tr><th>#</th><th>Student</th><th>Admission No.</th><th>Marks Obtained (/{maxMarks})</th><th>Percentage</th><th>Grade</th></tr>
             </thead>
             <tbody>
               {classStudents.length === 0 ? (
-                <tr><td colSpan={7} style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)' }}>No students found for class {paper.className}</td></tr>
+                <tr><td colSpan={6} style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)' }}>No students found for this class</td></tr>
               ) : classStudents.map((s, i) => {
                 const mo    = marks[s.id] !== '' ? Number(marks[s.id]) : null;
-                const pct   = mo !== null ? Math.round((mo / paper.maxMarks) * 100) : null;
-                const grade = pct !== null ? gradeFromPct(pct) : '—';
+                const pct   = mo !== null ? Math.round((mo / maxMarks) * 100) : null;
+                const grade = pct !== null ? gradePreview(pct) : '—';
                 return (
                   <tr key={s.id}>
                     <td style={{ color: 'var(--text-muted)' }}>{i + 1}</td>
+                    <td style={{ fontWeight: 600, fontSize: 13 }}>{s.firstName} {s.lastName}</td>
+                    <td>{s.admissionNumber}</td>
                     <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span className="avatar avatar-sm role-student">{s.avatar}</span>
-                        <div>
-                          <div style={{ fontWeight: 600, fontSize: 13 }}>{s.name}</div>
-                          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Class {s.class}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td>{s.rollNo}</td>
-                    <td>
-                      <input type="number" className="marks-input" value={marks[s.id]} onChange={e => setMark(s.id, e.target.value)} min="0" max={paper.maxMarks} placeholder="—" />
+                      <input type="number" className="marks-input" value={marks[s.id]} onChange={e => setMark(s.id, e.target.value)} min="0" max={maxMarks} placeholder="—" />
                     </td>
                     <td style={{ fontWeight: pct !== null ? 600 : 400, color: pct !== null ? (pct >= 33 ? 'var(--success)' : 'var(--danger)') : 'var(--text-muted)' }}>
                       {pct !== null ? `${pct}%` : '—'}
@@ -872,7 +899,6 @@ function ResultsEntry({ paper, existingResults, onSave, onBack }) {
                     <td>
                       {grade !== '—' ? <span className={`badge ${grade === 'F' ? 'badge-danger' : grade.startsWith('A') ? 'badge-success' : 'badge-warning'}`}>{grade}</span> : '—'}
                     </td>
-                    <td style={{ fontSize: 12, color: 'var(--text-muted)' }}>{pct !== null ? remarkFromPct(pct) : '—'}</td>
                   </tr>
                 );
               })}
@@ -880,7 +906,7 @@ function ResultsEntry({ paper, existingResults, onSave, onBack }) {
           </table>
         </div>
         <div style={{ padding: '12px 20px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end' }}>
-          <button className="btn btn-primary" onClick={handleSave}>💾 Save Results</button>
+          <button className="btn btn-primary" onClick={handleSave} disabled={saving}>💾 Save Results</button>
         </div>
       </div>
     </div>
@@ -888,29 +914,31 @@ function ResultsEntry({ paper, existingResults, onSave, onBack }) {
 }
 
 // ─── Results Viewer ───────────────────────────────────────────────────────────
-function ResultsViewer({ allResults, allPapers }) {
-  const [filterPaper, setFilterPaper] = useState('all');
+function ResultsViewer({ allResults, exams, students, classes }) {
+  const [filterExam, setFilterExam]   = useState('all');
   const [filterClass, setFilterClass] = useState('all');
 
+  const studentById = (id) => students.find(s => s.id === id);
+
   const filtered = allResults.filter(r => {
-    const mp      = filterPaper === 'all' || String(r.paperId) === filterPaper;
-    const student = users.find(u => u.id === r.studentId);
-    const mc      = filterClass === 'all' || student?.class === filterClass;
-    return mp && mc;
+    const me = filterExam === 'all' || String(r.examId) === filterExam;
+    const student = studentById(r.studentId);
+    const mc = filterClass === 'all' || String(student?.classId) === filterClass;
+    return me && mc;
   });
 
   return (
     <div>
       <div className="page-header">
-        <div className="page-header-left"><h1>Results Report</h1><p>View all exam results by paper and class</p></div>
+        <div className="page-header-left"><h1>Results Report</h1><p>View all exam results by exam and class</p></div>
       </div>
 
       <div className="stat-grid mb-20" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))' }}>
         {[
-          { label: 'Total Results', value: allResults.length,                                    icon: '📊', color: 'bg-blue'   },
-          { label: 'Passed',        value: allResults.filter(r => r.grade !== 'F').length,        icon: '✅', color: 'bg-green'  },
-          { label: 'Failed',        value: allResults.filter(r => r.grade === 'F').length,        icon: '❌', color: 'bg-red'    },
-          { label: 'Distinctions',  value: allResults.filter(r => r.percentage >= 75).length,     icon: '🏆', color: 'bg-purple' },
+          { label: 'Total Results', value: allResults.length,                                                          icon: '📊', color: 'bg-blue'   },
+          { label: 'Passed',        value: allResults.filter(r => r.grade !== 'F').length,                             icon: '✅', color: 'bg-green'  },
+          { label: 'Failed',        value: allResults.filter(r => r.grade === 'F').length,                             icon: '❌', color: 'bg-red'    },
+          { label: 'Distinctions',  value: allResults.filter(r => (r.marksObtained / r.maxMarks) * 100 >= 75).length,   icon: '🏆', color: 'bg-purple' },
         ].map(s => (
           <div key={s.label} className="stat-card">
             <div className={`stat-icon ${s.color}`}>{s.icon}</div>
@@ -921,13 +949,13 @@ function ResultsViewer({ allResults, allPapers }) {
 
       <div className="card mb-20">
         <div className="card-body" style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-          <select className="form-control" style={{ maxWidth: 280 }} value={filterPaper} onChange={e => setFilterPaper(e.target.value)}>
-            <option value="all">All Papers</option>
-            {allPapers.map(p => <option key={p.id} value={p.id}>{p.title}</option>)}
+          <select className="form-control" style={{ maxWidth: 300 }} value={filterExam} onChange={e => setFilterExam(e.target.value)}>
+            <option value="all">All Exams</option>
+            {exams.map(ex => <option key={ex.id} value={ex.id}>{ex.subject} — Class {classLabel(ex.classId, classes)} ({ex.examDate})</option>)}
           </select>
           <select className="form-control" style={{ maxWidth: 160 }} value={filterClass} onChange={e => setFilterClass(e.target.value)}>
             <option value="all">All Classes</option>
-            {CLASS_NAMES.map(c => <option key={c}>{c}</option>)}
+            {classes.map(c => <option key={c.id} value={String(c.id)}>Class {c.gradeLevel}{c.section}</option>)}
           </select>
           <span style={{ marginLeft: 'auto', fontSize: 13, color: 'var(--text-muted)' }}>{filtered.length} result{filtered.length !== 1 ? 's' : ''}</span>
         </div>
@@ -937,32 +965,25 @@ function ResultsViewer({ allResults, allPapers }) {
         <div className="table-wrapper">
           <table>
             <thead>
-              <tr><th>Student</th><th>Class</th><th>Subject</th><th>Paper</th><th>Marks</th><th>Percentage</th><th>Grade</th><th>Remarks</th></tr>
+              <tr><th>Student</th><th>Class</th><th>Subject</th><th>Marks</th><th>Percentage</th><th>Grade</th></tr>
             </thead>
             <tbody>
               {filtered.length === 0 ? (
-                <tr><td colSpan={8} style={{ textAlign: 'center', padding: 32, color: 'var(--text-muted)' }}>No results found</td></tr>
-              ) : filtered.map((r, i) => {
-                const student = users.find(u => u.id === r.studentId);
-                const pap     = allPapers.find(p => p.id === r.paperId);
+                <tr><td colSpan={6} style={{ textAlign: 'center', padding: 32, color: 'var(--text-muted)' }}>No results found</td></tr>
+              ) : filtered.map(r => {
+                const student = studentById(r.studentId);
+                const pct = Math.round((r.marksObtained / r.maxMarks) * 100);
                 return (
-                  <tr key={i}>
+                  <tr key={r.id}>
                     <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span className="avatar avatar-sm role-student">{student?.avatar}</span>
-                        <div>
-                          <div style={{ fontWeight: 600, fontSize: 13 }}>{student?.name || `Student #${r.studentId}`}</div>
-                          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Roll: {student?.rollNo}</div>
-                        </div>
-                      </div>
+                      <div style={{ fontWeight: 600, fontSize: 13 }}>{student ? `${student.firstName} ${student.lastName}` : `Student #${r.studentId}`}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{student?.admissionNumber}</div>
                     </td>
-                    <td><span className="badge badge-info">{student?.class}</span></td>
+                    <td><span className="badge badge-info">{classLabel(student?.classId, classes)}</span></td>
                     <td>{r.subject}</td>
-                    <td style={{ fontSize: 12, color: 'var(--text-muted)' }}>{pap?.title || '—'}</td>
                     <td style={{ fontWeight: 600 }}>{r.marksObtained} / {r.maxMarks}</td>
-                    <td style={{ fontWeight: 600, color: r.percentage >= 33 ? 'var(--success)' : 'var(--danger)' }}>{r.percentage}%</td>
+                    <td style={{ fontWeight: 600, color: pct >= 33 ? 'var(--success)' : 'var(--danger)' }}>{pct}%</td>
                     <td><span className={`badge ${r.grade === 'F' ? 'badge-danger' : r.grade?.startsWith('A') ? 'badge-success' : 'badge-warning'}`}>{r.grade}</span></td>
-                    <td style={{ fontSize: 12 }}>{r.remarks}</td>
                   </tr>
                 );
               })}
@@ -977,34 +998,44 @@ function ResultsViewer({ allResults, allPapers }) {
 // ─── Root ──────────────────────────────────────────────────────────────────────
 export default function QuestionPaperManagement({ defaultView = 'list' }) {
   const { currentUser } = useAuth();
-  const [papers, setPapers]           = useState(initialPapers);
-  const [results, setResults]         = useState(initialResults);
+  const { classes, exams, results, addResult } = useData();
+
+  const [papers, setPapers]           = useState([]);
+  const [papersError, setPapersError] = useState('');
+  const [students, setStudents]       = useState([]);
   const [view, setView]               = useState(defaultView);
   const [selected, setSelected]       = useState(null);
   const [newPaperType, setNewPaperType] = useState(null);
 
-  const handleSavePaper = (paperData) => {
-    if (paperData.id) {
-      setPapers(prev => prev.map(p => p.id === paperData.id ? paperData : p));
-    } else {
-      const newId = Math.max(...papers.map(p => p.id), 0) + 1;
-      setPapers(prev => [...prev, { ...paperData, id: newId }]);
+  const canManage = ['principal', 'headmaster', 'teacher'].includes(currentUser?.role);
+
+  const loadPapers = useCallback(async () => {
+    try {
+      setPapers(await academicsApi.listQuestionPapers());
+      setPapersError('');
+    } catch (err) {
+      setPapersError(err.message || 'Failed to load question papers');
     }
+  }, []);
+
+  useEffect(() => { loadPapers(); }, [loadPapers]);
+
+  useEffect(() => {
+    if (!canManage) { setStudents([]); return; }
+    peopleApi.listStudents().then(setStudents).catch(() => setStudents([]));
+  }, [canManage]);
+
+  const handleSavePaper = async (paperData) => {
+    const created = await academicsApi.createQuestionPaper(paperData);
+    setPapers(prev => [...prev, created]);
     setView('list');
     setNewPaperType(null);
   };
 
-  const handleDelete = (id) => {
-    if (window.confirm('Delete this question paper? This cannot be undone.')) {
-      setPapers(prev => prev.filter(p => p.id !== id));
+  const handleSaveResults = async (newResults) => {
+    for (const r of newResults) {
+      await addResult(r);
     }
-  };
-
-  const handleSaveResults = (newResults) => {
-    setResults(prev => {
-      const filtered = prev.filter(r => !newResults.some(nr => nr.studentId === r.studentId && nr.subject === r.subject && nr.paperId === r.paperId));
-      return [...filtered, ...newResults];
-    });
   };
 
   if (view === 'typePicker') {
@@ -1016,21 +1047,31 @@ export default function QuestionPaperManagement({ defaultView = 'list' }) {
     );
   }
   if (view === 'view' && selected) {
-    return <PaperViewer paper={selected} onBack={() => setView('list')} />;
+    return <PaperViewer paper={selected} classes={classes} onBack={() => setView('list')} />;
   }
   if (view === 'edit') {
     return (
       <PaperEditor
-        paper={selected}
-        paperType={selected ? (selected.paperType || 'complete') : (newPaperType?.value || 'complete')}
+        paperType={newPaperType?.value || 'complete'}
         onSave={handleSavePaper}
         onBack={() => { setView('list'); setNewPaperType(null); }}
-        currentUser={currentUser}
+        classes={classes}
+        exams={exams}
       />
     );
   }
   if (view === 'results' && selected) {
-    return <ResultsEntry paper={selected} existingResults={results} onSave={handleSaveResults} onBack={() => setView('list')} />;
+    return (
+      <ResultsEntry
+        paper={selected}
+        exam={exams.find(e => e.id === selected.examId)}
+        students={students}
+        existingResults={results}
+        classes={classes}
+        onSave={handleSaveResults}
+        onBack={() => setView('list')}
+      />
+    );
   }
   if (view === 'resultView') {
     return (
@@ -1039,7 +1080,7 @@ export default function QuestionPaperManagement({ defaultView = 'list' }) {
           <div className="page-header-left"><h1>Results Management</h1></div>
           <button className="btn btn-ghost" onClick={() => setView('list')}>← Back to Papers</button>
         </div>
-        <ResultsViewer allResults={results} allPapers={papers} />
+        <ResultsViewer allResults={results} exams={exams} students={students} classes={classes} />
       </div>
     );
   }
@@ -1055,12 +1096,14 @@ export default function QuestionPaperManagement({ defaultView = 'list' }) {
         </button>
       </div>
 
+      {papersError && <div className="alert alert-danger mb-20">{papersError}</div>}
+
       <PaperList
         papers={papers}
+        classes={classes}
         currentUser={currentUser}
         onView={p => { setSelected(p); setView('view'); }}
-        onEdit={p => { setSelected(p); setView(p === null ? 'typePicker' : 'edit'); }}
-        onDelete={handleDelete}
+        onCreate={() => setView('typePicker')}
         onCreateResult={p => { setSelected(p); setView('results'); }}
       />
     </div>

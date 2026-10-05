@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { schoolInfo, announcements, holidays } from '../../data/mockData';
+import { schoolInfo, holidays } from '../../data/mockData';
 
 export default function GuestHome({ onLogin }) {
   const badgeColors = { National:'badge-danger', Festival:'badge-warning', Regional:'badge-purple' };
@@ -47,7 +47,7 @@ export default function GuestHome({ onLogin }) {
 
       {/* Tabs */}
       <div className="tabs">
-        {['about','notices','holidays'].map(t => (
+        {['about','holidays'].map(t => (
           <div key={t} className={`tab ${tab === t ? 'active' : ''}`}
             onClick={() => setTab(t)} style={{ textTransform:'capitalize' }}>{t}</div>
         ))}
@@ -99,23 +99,6 @@ export default function GuestHome({ onLogin }) {
               </button>
             </div>
           </div>
-        </div>
-      )}
-
-      {tab === 'notices' && (
-        <div style={{ display:'grid', gap:12 }}>
-          {announcements.map(a => (
-            <div key={a.id} className="card">
-              <div className="card-body" style={{padding:16}}>
-                <div style={{fontWeight:600,fontSize:14,marginBottom:6}}>{a.title}</div>
-                <p style={{fontSize:13,color:'var(--text-secondary)',marginBottom:8}}>{a.body}</p>
-                <div style={{fontSize:11,color:'var(--text-muted)'}}>
-                  Posted by {a.postedBy} · {a.date} ·{' '}
-                  <span className={`badge badge-${a.priority==='high'?'danger':'warning'}`}>{a.priority}</span>
-                </div>
-              </div>
-            </div>
-          ))}
         </div>
       )}
 

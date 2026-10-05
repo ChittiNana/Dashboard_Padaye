@@ -1,34 +1,18 @@
 import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { getDemoCredentials, schoolInfo } from '../../data/mockData';
-
-const roleColors = {
-  Principal:  'role-principal',
-  Headmaster: 'role-headmaster',
-  Teacher:    'role-teacher',
-  Student:    'role-student',
-  Parent:     'role-parent',
-  Guest:      'role-guest',
-};
+import { schoolInfo } from '../../data/mockData';
 
 export default function Login() {
   const { login, error } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading]   = useState(false);
-  const demos = getDemoCredentials();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    await new Promise(r => setTimeout(r, 400));
-    login(username, password);
+    await login(username, password);
     setLoading(false);
-  };
-
-  const fillDemo = (cred) => {
-    setUsername(cred.username);
-    setPassword(cred.password);
   };
 
   return (
@@ -93,23 +77,6 @@ export default function Login() {
               {loading ? 'Signing in…' : 'Sign In →'}
             </button>
           </form>
-
-          <div className="demo-creds">
-            <div className="demo-creds-title">Quick Login — Demo Accounts</div>
-            <div className="demo-creds-grid">
-              {demos.map(d => (
-                <button key={d.role} className="demo-cred-chip" onClick={() => fillDemo(d)}>
-                  <span className={`avatar avatar-sm ${roleColors[d.role]}`}>
-                    {d.role[0]}
-                  </span>
-                  <span>
-                    <div className="demo-cred-role">{d.role}</div>
-                    <div className="demo-cred-user">{d.username}</div>
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
         </div>
       </div>
     </div>

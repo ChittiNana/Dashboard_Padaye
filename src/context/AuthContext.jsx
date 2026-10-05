@@ -1,38 +1,156 @@
-import { createContext, useContext, useState, useCallback } from 'react';
-import { users as initialUsers } from '../data/mockData';
+import { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
+import * as authApi from '../api/authApi';
+import * as peopleApi from '../api/peopleApi';
+import { decodeToken, isExpired, setTokens, clearTokens, getAccessToken } from '../api/tokenStorage';
 
 const AuthContext = createContext(null);
 
-export function AuthProvider({ children }) {
-  const [currentUser, setCurrentUser] = useState(null);
-  const [error, setError] = useState('');
-  const [allUsers, setAllUsers] = useState(initialUsers);
+const STAFF_ROLES = ['teacher', 'principal', 'headmaster', 'accountant', 'support_staff'];
 
-  const login = useCallback((username, password) => {
-    const user = allUsers.find(u => u.username === username && u.password === password);
-    if (user) {
-      setCurrentUser(user);
+function personName(record) {
+  return `${record.firstName || ''} ${record.lastName || ''}`.trim();
+}
+
+function personAvatar(record) {
+  return `${(record.firstName || '')[0] || ''}${(record.lastName || '')[0] || ''}`.toUpperCase();
+}
+
+function toStudentView(record) {
+  return { ...record, role: 'student', name: personName(record), avatar: personAvatar(record) };
+}
+
+function toStaffView(record) {
+  return {
+    ...record,
+    role: (record.staffRole || '').toLowerCase(),
+    name: personName(record),
+    avatar: personAvatar(record),
+  };
+}
+
+function userFromDecodedToken(decoded) {
+  if (!decoded) return null;
+  const roles = decoded.roles || [];
+  return {
+    id: decoded.userId,
+    username: decoded.username,
+    roles,
+    role: (roles[0] || '').toLowerCase(),
+  };
+}
+
+function initialUser() {
+  const decoded = decodeToken(getAccessToken());
+  if (!decoded || isExpired(decoded)) return null;
+  return userFromDecodedToken(decoded);
+}
+
+export function AuthProvider({ children }) {
+  const [currentUser, setCurrentUser] = useState(initialUser);
+  const [error, setError] = useState('');
+  const [allStudents, setAllStudents] = useState([]);
+  const [allStaff, setAllStaff] = useState([]);
+  const [myChildren, setMyChildren] = useState([]);
+
+  const loadPeople = useCallback(async (user) => {
+    if (!user) {
+      setAllStudents([]);
+      setAllStaff([]);
+      setMyChildren([]);
+      return;
+    }
+    try {
+      if (['principal', 'headmaster', 'teacher'].includes(user.role)) {
+        const students = await peopleApi.listStudents();
+        setAllStudents(students.map(toStudentView));
+      } else {
+        setAllStudents([]);
+      }
+
+      if (['principal', 'headmaster'].includes(user.role)) {
+        const staff = await peopleApi.listStaff();
+        setAllStaff(staff.map(toStaffView));
+      } else {
+        setAllStaff([]);
+      }
+
+      let selfPatch = null;
+
+      if (user.role === 'student') {
+        const self = await peopleApi.getMyStudentRecord();
+        selfPatch = {
+          studentId: self.id,
+          classId: self.classId,
+          admissionNumber: self.admissionNumber,
+          firstName: self.firstName,
+          lastName: self.lastName,
+          name: personName(self),
+          avatar: personAvatar(self),
+        };
+      } else if (STAFF_ROLES.includes(user.role)) {
+        const self = await peopleApi.getMyStaffRecord();
+        selfPatch = {
+          staffId: self.id,
+          staffCode: self.staffCode,
+          firstName: self.firstName,
+          lastName: self.lastName,
+          name: personName(self),
+          avatar: personAvatar(self),
+          email: self.email,
+          phone: self.phone,
+        };
+      } else if (user.role === 'parent') {
+        const kids = await peopleApi.getChildrenForParent(user.id);
+        setMyChildren(kids.map(toStudentView));
+      }
+
+      if (selfPatch) {
+        setCurrentUser((u) => (u ? { ...u, ...selfPatch } : u));
+      }
+    } catch {
+      // People-service data is supplementary — auth stays valid even if this fails.
+    }
+  }, []);
+
+  useEffect(() => {
+    loadPeople(currentUser);
+    // Only rerun when identity changes, not on every currentUser field update from loadPeople itself.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser?.id]);
+
+  const login = useCallback(async (username, password) => {
+    try {
+      const tokens = await authApi.login(username, password);
+      setTokens(tokens);
+      const decoded = decodeToken(tokens.accessToken);
+      setCurrentUser(userFromDecodedToken(decoded));
       setError('');
       return true;
+    } catch (err) {
+      clearTokens();
+      setCurrentUser(null);
+      setError(err.message || 'Invalid username or password.');
+      return false;
     }
-    setError('Invalid username or password.');
-    return false;
-  }, [allUsers]);
+  }, []);
 
   const logout = useCallback(() => {
+    clearTokens();
     setCurrentUser(null);
     setError('');
   }, []);
 
-  const registerUser = useCallback((userData) => {
-    const newId = Math.max(...allUsers.map(u => u.id)) + 1;
-    const newUser = { ...userData, id: newId };
-    setAllUsers(prev => [...prev, newUser]);
-    return newUser;
-  }, [allUsers]);
+  const registerUser = useCallback(async (userData) => {
+    return authApi.register(userData);
+  }, []);
+
+  const allUsers = useMemo(() => [...allStaff, ...allStudents], [allStaff, allStudents]);
 
   return (
-    <AuthContext.Provider value={{ currentUser, allUsers, login, logout, registerUser, error }}>
+    <AuthContext.Provider value={{
+      currentUser, login, logout, registerUser, error,
+      allUsers, allStudents, allStaff, myChildren,
+    }}>
       {children}
     </AuthContext.Provider>
   );

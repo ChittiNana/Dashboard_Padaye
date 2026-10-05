@@ -1,24 +1,51 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { users, attendance, results, homework, fees, exams, messages, announcements, holidays } from '../../data/mockData';
+import { useData } from '../../context/DataContext';
+import * as attendanceApi from '../../api/attendanceApi';
+import * as feeApi from '../../api/feeApi';
+import * as academicsApi from '../../api/academicsApi';
+import { users, messages, holidays } from '../../data/mockData';
+
+function todayISO() { return new Date().toISOString().slice(0, 10); }
 
 /* ── Dashboard ──────────────────────────────────────────────── */
 function Dashboard({ parent, children }) {
+  const { classes, announcements, homework } = useData();
   const child = children[0];
+
+  const [attSummary, setAttSummary] = useState(null);
+  useEffect(() => {
+    if (!child) return;
+    attendanceApi.getStudentAttendance(child.id).then(setAttSummary).catch(() => setAttSummary(null));
+  }, [child]);
+
+  const [feeStatus, setFeeStatus] = useState(null);
+  useEffect(() => {
+    if (!child) return;
+    feeApi.getStatusForStudent(child.id).then(setFeeStatus).catch(() => setFeeStatus(null));
+  }, [child]);
+
+  const [myResults, setMyResults] = useState([]);
+  useEffect(() => {
+    if (!child) return;
+    academicsApi.getResultsByStudent(child.id).then(setMyResults).catch(() => setMyResults([]));
+  }, [child]);
+
   if (!child) return <div className="empty-state"><div className="empty-state-icon">👶</div><h3>No children linked</h3></div>;
 
-  const myAtt    = attendance.filter(a => a.studentId === child.id);
-  const attPct   = myAtt.length ? Math.round(myAtt.filter(a=>a.status==='Present').length / myAtt.length * 100) : 0;
-  const pendingHW= homework.filter(h => h.class === child.class && h.status === 'pending').length;
-  const myFees   = fees.filter(f => f.studentId === child.id);
-  const feeDue   = myFees.filter(f => !f.paid).reduce((s,f)=>s+f.amount,0);
-  const unread   = messages.filter(m => m.toId === parent.id && !m.read);
+  const childClassName = classes.find(c => c.id === child.classId)?.name;
+  const attPct      = attSummary?.attendancePercentage ?? 0;
+  const presentDays = attSummary?.presentDays ?? 0;
+  const absentDays  = attSummary?.absentDays ?? 0;
+  const lateDays    = (attSummary?.records || []).filter(r => r.status === 'LATE').length;
+  const pendingHW= homework.filter(h => h.classId === child.classId && h.dueDate >= todayISO()).length;
+  const feeDue   = feeStatus?.pendingAmount ?? 0;
 
   return (
     <div>
       <div className="page-header">
         <div className="page-header-left">
-          <h1>Hello, {parent.name.split(' ')[1]} 👋</h1>
+          <h1>Hello, {parent.username} 👋</h1>
           <p>Parent Portal — monitoring {children.map(c=>c.name).join(', ')}</p>
         </div>
         <span className="badge badge-orange">Parent Portal</span>
@@ -31,7 +58,7 @@ function Dashboard({ parent, children }) {
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 4 }}>{child.name}</div>
             <div style={{ opacity: 0.8, fontSize: 13 }}>
-              Class {child.class} · Roll No. {child.rollNo} · Admission Year {child.admissionYear}
+              Class {childClassName} · Admission No. {child.admissionNumber}
             </div>
           </div>
           <div style={{ display:'flex', gap: 24, textAlign:'center' }}>
@@ -56,9 +83,9 @@ function Dashboard({ parent, children }) {
         <div className="card">
           <div className="card-header"><div className="card-title">Attendance Overview</div></div>
           <div className="card-body">
-            {[['Present', myAtt.filter(a=>a.status==='Present').length, 'var(--success)'],
-              ['Absent',  myAtt.filter(a=>a.status==='Absent').length,  'var(--danger)'],
-              ['Late',    myAtt.filter(a=>a.status==='Late').length,    'var(--warning)'],
+            {[['Present', presentDays, 'var(--success)'],
+              ['Absent',  absentDays,  'var(--danger)'],
+              ['Late',    lateDays,    'var(--warning)'],
             ].map(([label, count, color]) => (
               <div key={label} style={{ display:'flex', alignItems:'center', gap: 12, marginBottom: 12 }}>
                 <div style={{ width: 8, height: 8, borderRadius: '50%', background: color, flexShrink: 0 }} />
@@ -83,14 +110,12 @@ function Dashboard({ parent, children }) {
         <div className="card">
           <div className="card-header"><div className="card-title">Latest Results</div></div>
           <div className="card-body" style={{ padding: 0 }}>
-            {results.filter(r => r.studentId === child.id).map((r, i) => {
-              const exam = exams.find(e => e.id === r.examId);
+            {myResults.map((r, i) => {
               const pct = Math.round(r.marksObtained / r.maxMarks * 100);
               return (
                 <div key={i} style={{ padding:'10px 20px', borderBottom:'1px solid var(--border)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
                   <div>
                     <div style={{ fontWeight: 500, fontSize: 13 }}>{r.subject}</div>
-                    <div style={{ fontSize: 11, color:'var(--text-muted)' }}>{exam?.name}</div>
                   </div>
                   <div style={{ display:'flex', alignItems:'center', gap: 8 }}>
                     <div style={{
@@ -109,7 +134,7 @@ function Dashboard({ parent, children }) {
                 </div>
               );
             })}
-            {results.filter(r => r.studentId === child.id).length === 0 && (
+            {myResults.length === 0 && (
               <div style={{ padding: 20, textAlign:'center', color:'var(--text-muted)', fontSize: 13 }}>No results published yet.</div>
             )}
           </div>
@@ -119,17 +144,15 @@ function Dashboard({ parent, children }) {
         <div className="card">
           <div className="card-header"><div className="card-title">Homework Status</div></div>
           <div className="card-body" style={{ padding: 0 }}>
-            {homework.filter(h => h.class === child.class).slice(0, 5).map(hw => (
-              <div key={hw.id} style={{ padding:'10px 20px', borderBottom:'1px solid var(--border)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                <div>
-                  <div style={{ fontWeight: 500, fontSize: 13 }}>{hw.title}</div>
-                  <div style={{ fontSize: 11, color:'var(--text-muted)' }}>{hw.subject} · Due: {hw.dueDate}</div>
-                </div>
-                <span className={`badge badge-${hw.status === 'graded' ? 'success' : hw.status === 'submitted' ? 'info' : 'warning'}`}>
-                  {hw.status}
-                </span>
+            {homework.filter(h => h.classId === child.classId).slice(0, 5).map(hw => (
+              <div key={hw.id} style={{ padding:'10px 20px', borderBottom:'1px solid var(--border)' }}>
+                <div style={{ fontWeight: 500, fontSize: 13 }}>{hw.title}</div>
+                <div style={{ fontSize: 11, color:'var(--text-muted)' }}>{hw.subject} · Due: {hw.dueDate}</div>
               </div>
             ))}
+            {homework.filter(h => h.classId === child.classId).length === 0 && (
+              <div style={{ padding: 20, textAlign:'center', color:'var(--text-muted)', fontSize: 13 }}>No homework assigned yet.</div>
+            )}
           </div>
         </div>
 
@@ -137,10 +160,10 @@ function Dashboard({ parent, children }) {
         <div className="card">
           <div className="card-header"><div className="card-title">School Notices</div></div>
           <div className="card-body" style={{ padding:'8px 0' }}>
-            {announcements.filter(a => a.audience === 'all' || a.audience === 'parent').slice(0, 4).map(a => (
+            {announcements.slice(0, 4).map(a => (
               <div key={a.id} style={{ padding:'10px 20px', borderBottom:'1px solid var(--border)' }}>
                 <div style={{ fontWeight: 500, fontSize: 13 }}>{a.title}</div>
-                <div style={{ fontSize: 11, color:'var(--text-muted)' }}>{a.date}</div>
+                <div style={{ fontSize: 11, color:'var(--text-muted)' }}>{a.createdAt ? new Date(a.createdAt).toLocaleDateString() : '—'}</div>
               </div>
             ))}
           </div>
@@ -152,24 +175,46 @@ function Dashboard({ parent, children }) {
 
 /* ── Attendance View ────────────────────────────────────────── */
 function AttendanceView({ children }) {
+  const { classes } = useData();
   const child = children[0];
-  const myAtt = attendance.filter(a => a.studentId === child?.id).sort((a,b) => new Date(b.date) - new Date(a.date));
-  const pct = myAtt.length ? Math.round(myAtt.filter(a=>a.status==='Present').length / myAtt.length * 100) : 0;
+  const childClassName = classes.find(c => c.id === child?.classId)?.name;
+
+  const [attSummary, setAttSummary] = useState(null);
+  const [loading,    setLoading]    = useState(false);
+  const [loadError,  setLoadError]  = useState('');
+
+  useEffect(() => {
+    if (!child) return;
+    setLoading(true);
+    setLoadError('');
+    attendanceApi.getStudentAttendance(child.id)
+      .then(setAttSummary)
+      .catch(err => setLoadError(err.message || 'Failed to load attendance.'))
+      .finally(() => setLoading(false));
+  }, [child]);
+
+  const records = [...(attSummary?.records || [])].sort((a,b) => new Date(b.date) - new Date(a.date));
+  const pct     = attSummary?.attendancePercentage ?? 0;
+  const present = attSummary?.presentDays ?? 0;
+  const absent  = attSummary?.absentDays ?? 0;
+  const late    = records.filter(r => r.status === 'LATE').length;
 
   return (
     <div>
       <div className="page-header">
         <div className="page-header-left">
           <h1>{child?.name}'s Attendance</h1>
-          <p>Class {child?.class}</p>
+          <p>Class {childClassName}</p>
         </div>
       </div>
 
+      {loadError && <div className="alert alert-danger mb-20">{loadError}</div>}
+
       <div className="stat-grid mb-20">
-        {[['✅','Present', myAtt.filter(a=>a.status==='Present').length,'bg-green'],
-          ['❌','Absent',  myAtt.filter(a=>a.status==='Absent').length, 'bg-red'],
-          ['⏰','Late',    myAtt.filter(a=>a.status==='Late').length,   'bg-yellow'],
-          ['📊','Att. %',  `${pct}%`,                                    'bg-blue'],
+        {[['✅','Present', present,   'bg-green'],
+          ['❌','Absent',  absent,    'bg-red'],
+          ['⏰','Late',    late,      'bg-yellow'],
+          ['📊','Att. %',  `${pct}%`, 'bg-blue'],
         ].map(([icon,label,val,color]) => (
           <div key={label} className="stat-card">
             <div className={`stat-icon ${color}`}>{icon}</div>
@@ -183,12 +228,16 @@ function AttendanceView({ children }) {
           <table>
             <thead><tr><th>Date</th><th>Day</th><th>Status</th></tr></thead>
             <tbody>
-              {myAtt.map((a,i) => (
-                <tr key={i}>
+              {loading ? (
+                <tr><td colSpan={3} style={{ textAlign:'center', padding: 24 }}>Loading…</td></tr>
+              ) : records.length === 0 ? (
+                <tr><td colSpan={3} style={{ textAlign:'center', color:'var(--text-muted)', padding: 24 }}>No attendance records yet.</td></tr>
+              ) : records.map((a,i) => (
+                <tr key={a.id ?? i}>
                   <td>{a.date}</td>
                   <td style={{ fontSize: 12, color:'var(--text-muted)' }}>{new Date(a.date).toLocaleDateString('en-IN',{weekday:'long'})}</td>
                   <td>
-                    <span className={`badge badge-${a.status==='Present'?'success':a.status==='Absent'?'danger':'warning'}`}>
+                    <span className={`badge badge-${a.status==='PRESENT'?'success':a.status==='ABSENT'?'danger':'warning'}`}>
                       {a.status}
                     </span>
                   </td>
@@ -205,7 +254,16 @@ function AttendanceView({ children }) {
 /* ── Exam Results ───────────────────────────────────────────── */
 function ExamResults({ children }) {
   const child = children[0];
-  const myResults = results.filter(r => r.studentId === child?.id);
+  const [myResults, setMyResults] = useState([]);
+  const [loading,   setLoading]   = useState(true);
+
+  useEffect(() => {
+    if (!child) { setLoading(false); return; }
+    academicsApi.getResultsByStudent(child.id)
+      .then(setMyResults)
+      .catch(() => setMyResults([]))
+      .finally(() => setLoading(false));
+  }, [child]);
 
   return (
     <div>
@@ -216,20 +274,18 @@ function ExamResults({ children }) {
         </div>
       </div>
 
-      {myResults.length === 0 ? (
+      {!loading && myResults.length === 0 ? (
         <div className="card"><div className="empty-state"><div className="empty-state-icon">📊</div><h3>No results yet</h3><p>Results will appear here after exams.</p></div></div>
       ) : (
         <div className="card">
           <div className="table-wrapper">
             <table>
-              <thead><tr><th>Exam</th><th>Subject</th><th>Marks</th><th>Max</th><th>%</th><th>Grade</th><th>Remarks</th></tr></thead>
+              <thead><tr><th>Subject</th><th>Marks</th><th>Max</th><th>%</th><th>Grade</th></tr></thead>
               <tbody>
                 {myResults.map((r,i) => {
-                  const exam = exams.find(e => e.id === r.examId);
                   const pct = Math.round(r.marksObtained/r.maxMarks*100);
                   return (
                     <tr key={i}>
-                      <td>{exam?.name}</td>
                       <td><span className="badge badge-info">{r.subject}</span></td>
                       <td style={{ fontWeight:700, fontSize:16 }}>{r.marksObtained}</td>
                       <td>{r.maxMarks}</td>
@@ -248,7 +304,6 @@ function ExamResults({ children }) {
                           {r.grade}
                         </div>
                       </td>
-                      <td><span className="badge badge-gray">{r.remarks}</span></td>
                     </tr>
                   );
                 })}
@@ -263,15 +318,17 @@ function ExamResults({ children }) {
 
 /* ── Homework Status ────────────────────────────────────────── */
 function HomeworkView({ children }) {
+  const { classes, homework } = useData();
   const child = children[0];
-  const myHW  = homework.filter(h => h.class === child?.class);
+  const childClassName = classes.find(c => c.id === child?.classId)?.name;
+  const myHW  = homework.filter(h => h.classId === child?.classId);
 
   return (
     <div>
       <div className="page-header">
         <div className="page-header-left">
           <h1>{child?.name}'s Homework</h1>
-          <p>Class {child?.class} assignments</p>
+          <p>Class {childClassName} assignments</p>
         </div>
       </div>
 
@@ -279,78 +336,139 @@ function HomeworkView({ children }) {
         {myHW.map(hw => (
           <div key={hw.id} className="card">
             <div className="card-body" style={{ padding: 16 }}>
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
-                <div>
-                  <div style={{ display:'flex', alignItems:'center', gap: 8, marginBottom: 6 }}>
-                    <span style={{ fontWeight: 700, fontSize: 14 }}>{hw.title}</span>
-                    <span className="badge badge-info">{hw.subject}</span>
-                    <span className={`badge badge-${hw.status==='graded'?'success':hw.status==='submitted'?'info':'warning'}`}>{hw.status}</span>
-                  </div>
-                  <p style={{ fontSize: 13, color:'var(--text-secondary)', marginBottom: 8 }}>{hw.description}</p>
-                  <div style={{ fontSize: 12, color:'var(--text-muted)' }}>
-                    Assigned: {hw.assignedDate} · Due: {hw.dueDate} · By {hw.assignedBy}
-                    {hw.grade && <span style={{ color:'var(--success)', fontWeight:600, marginLeft:8 }}>Grade: {hw.grade}</span>}
-                  </div>
-                </div>
+              <div style={{ display:'flex', alignItems:'center', gap: 8, marginBottom: 6 }}>
+                <span style={{ fontWeight: 700, fontSize: 14 }}>{hw.title}</span>
+                <span className="badge badge-info">{hw.subject}</span>
               </div>
+              <p style={{ fontSize: 13, color:'var(--text-secondary)', marginBottom: 8 }}>{hw.description}</p>
+              <div style={{ fontSize: 12, color:'var(--text-muted)' }}>Due: {hw.dueDate}</div>
             </div>
           </div>
         ))}
+        {myHW.length === 0 && (
+          <div className="card"><div className="card-body" style={{ textAlign:'center', color:'var(--text-muted)' }}>
+            No homework assigned yet.
+          </div></div>
+        )}
       </div>
     </div>
   );
 }
 
 /* ── Fee Status ─────────────────────────────────────────────── */
+const FEE_METHODS = ['CASH', 'CARD', 'UPI', 'BANK_TRANSFER'];
+const FEE_METHOD_LABELS = { CASH: 'Cash', CARD: 'Card', UPI: 'UPI', BANK_TRANSFER: 'Bank Transfer' };
+function feeStatusBadge(status) {
+  return { PAID: 'success', PARTIAL: 'warning', PENDING: 'danger', OVERDUE: 'danger' }[status] || 'gray';
+}
+
 function FeeStatus({ children }) {
   const child = children[0];
-  const myFees = fees.filter(f => f.studentId === child?.id);
-  const total = myFees.reduce((s,f)=>s+f.amount,0);
-  const paid  = myFees.filter(f=>f.paid).reduce((s,f)=>s+f.amount,0);
-  const due   = total - paid;
+  const [feeStatus, setFeeStatus] = useState(null);
+  const [loading,   setLoading]   = useState(false);
+  const [loadError, setLoadError] = useState('');
+
+  const [showPay,     setShowPay]     = useState(false);
+  const [payAmount,   setPayAmount]   = useState('');
+  const [payMethod,   setPayMethod]   = useState('CASH');
+  const [payRef,      setPayRef]      = useState('');
+  const [payError,    setPayError]    = useState('');
+  const [paySubmitting, setPaySubmitting] = useState(false);
+
+  const load = () => {
+    if (!child) return;
+    setLoading(true);
+    setLoadError('');
+    feeApi.getStatusForStudent(child.id)
+      .then(setFeeStatus)
+      .catch(err => setLoadError(err.message || 'Failed to load fee status.'))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(load, [child]);
+
+  const submitPay = async () => {
+    const amount = Number(payAmount);
+    if (!amount || amount <= 0) { setPayError('Enter a valid amount.'); return; }
+    setPaySubmitting(true);
+    setPayError('');
+    try {
+      await feeApi.payFee({ feeRecordId: feeStatus.feeRecordId, amount, method: payMethod, reference: payRef || undefined });
+      setShowPay(false);
+      setPayAmount('');
+      setPayRef('');
+      load();
+    } catch (err) {
+      setPayError(err.message || 'Payment failed.');
+    } finally {
+      setPaySubmitting(false);
+    }
+  };
 
   return (
     <div>
       <div className="page-header">
         <div className="page-header-left">
           <h1>Fee Status — {child?.name}</h1>
-          <p>Academic Year 2026-27</p>
+          <p>Academic Year {feeStatus?.academicYear || '—'}</p>
         </div>
       </div>
 
-      <div className="stat-grid mb-20">
-        <div className="stat-card"><div className="stat-icon bg-blue">💰</div><div className="stat-info"><div className="stat-value">₹{total.toLocaleString()}</div><div className="stat-label">Total Annual Fees</div></div></div>
-        <div className="stat-card"><div className="stat-icon bg-green">✅</div><div className="stat-info"><div className="stat-value">₹{paid.toLocaleString()}</div><div className="stat-label">Paid</div></div></div>
-        <div className="stat-card"><div className="stat-icon bg-red">⏳</div><div className="stat-info"><div className="stat-value">₹{due.toLocaleString()}</div><div className="stat-label">Pending</div></div></div>
-      </div>
+      {loadError && <div className="alert alert-danger mb-20">{loadError}</div>}
 
-      <div className="card">
-        <div className="table-wrapper">
-          <table>
-            <thead><tr><th>Term</th><th>Amount</th><th>Status</th><th>Paid Date</th><th>Method</th><th>Action</th></tr></thead>
-            <tbody>
-              {myFees.map((f,i) => (
-                <tr key={i}>
-                  <td style={{fontWeight:500}}>{f.term}</td>
-                  <td style={{fontWeight:600}}>₹{f.amount.toLocaleString()}</td>
-                  <td><span className={`badge badge-${f.paid?'success':'danger'}`}>{f.paid?'Paid':'Pending'}</span></td>
-                  <td style={{fontSize:12}}>{f.paidDate||'—'}</td>
-                  <td style={{fontSize:12}}>{f.method||'—'}</td>
-                  <td>{!f.paid && <button className="btn btn-primary btn-sm">Pay Now</button>}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      {loading ? (
+        <div className="card"><div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)' }}>Loading…</div></div>
+      ) : !feeStatus ? (
+        <div className="card"><div className="empty-state"><div className="empty-state-icon">💰</div><h3>No fee records found</h3></div></div>
+      ) : (
+        <>
+          <div className="stat-grid mb-20">
+            <div className="stat-card"><div className="stat-icon bg-blue">💰</div><div className="stat-info"><div className="stat-value">₹{feeStatus.totalAmount.toLocaleString()}</div><div className="stat-label">Total Fees</div></div></div>
+            <div className="stat-card"><div className="stat-icon bg-green">✅</div><div className="stat-info"><div className="stat-value">₹{feeStatus.paidAmount.toLocaleString()}</div><div className="stat-label">Paid</div></div></div>
+            <div className="stat-card"><div className="stat-icon bg-red">⏳</div><div className="stat-info"><div className="stat-value">₹{feeStatus.pendingAmount.toLocaleString()}</div><div className="stat-label">Pending</div></div></div>
+          </div>
+
+          <div className="card">
+            <div className="card-header">
+              <div className="card-title">Current Fee Record</div>
+              <span className={`badge badge-${feeStatusBadge(feeStatus.status)}`}>{feeStatus.status}</span>
+            </div>
+            <div className="card-body">
+              {feeStatus.status !== 'PAID' && !showPay && (
+                <button className="btn btn-primary btn-sm" onClick={() => setShowPay(true)}>Pay Now</button>
+              )}
+              {showPay && (
+                <div style={{ marginTop: 12 }}>
+                  {payError && <div className="alert alert-danger mb-8" style={{ fontSize: 12 }}>{payError}</div>}
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <input type="number" className="form-control" style={{ width: 120 }}
+                      placeholder="Amount" value={payAmount} onChange={e => setPayAmount(e.target.value)} />
+                    <select className="form-control" style={{ width: 150 }}
+                      value={payMethod} onChange={e => setPayMethod(e.target.value)}>
+                      {FEE_METHODS.map(m => <option key={m} value={m}>{FEE_METHOD_LABELS[m]}</option>)}
+                    </select>
+                    <input className="form-control" style={{ width: 150 }}
+                      placeholder="Reference (optional)" value={payRef} onChange={e => setPayRef(e.target.value)} />
+                    <button className="btn btn-primary btn-sm" disabled={paySubmitting} onClick={submitPay}>
+                      {paySubmitting ? 'Paying…' : 'Confirm Payment'}
+                    </button>
+                    <button className="btn btn-ghost btn-sm" onClick={() => setShowPay(false)}>Cancel</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
 
 /* ── Contact Teacher ────────────────────────────────────────── */
 function ContactTeacher({ parent, children }) {
+  const { allStaff } = useAuth();
   const child = children[0];
-  const teachers = users.filter(u => u.role === 'teacher' && u.classesHandled?.includes(child?.class));
+  const teachers = allStaff.filter(u => u.role === 'teacher');
   const [selected, setSelected] = useState(null);
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
@@ -386,12 +504,9 @@ function ContactTeacher({ parent, children }) {
             <div className="card-body" style={{ textAlign:'center', padding: 20 }}>
               <span className="avatar avatar-lg role-teacher" style={{ margin:'0 auto 10px' }}>{t.avatar}</span>
               <div style={{ fontWeight:700, fontSize:14 }}>{t.name}</div>
-              <div style={{ fontSize:12, color:'var(--text-muted)', marginBottom:6 }}>{t.subject}</div>
+              <div style={{ fontSize:12, color:'var(--text-muted)', marginBottom:6 }}>{t.staffCode}</div>
               <div style={{ fontSize:11, color:'var(--text-secondary)' }}>{t.email}</div>
               <div style={{ fontSize:11, color:'var(--text-secondary)' }}>{t.phone}</div>
-              <div style={{ display:'flex', flexWrap:'wrap', gap:4, justifyContent:'center', marginTop:8 }}>
-                {t.classesHandled?.map(c => <span key={c} className="badge badge-info">{c}</span>)}
-              </div>
             </div>
           </div>
         ))}
@@ -459,17 +574,21 @@ function MessagesView({ parent }) {
 
 /* ── Notices ────────────────────────────────────────────────── */
 function Notices() {
+  const { announcements } = useData();
   return (
     <div>
       <div className="page-header"><div className="page-header-left"><h1>School Notices</h1></div></div>
       <div style={{ display:'grid', gap:12 }}>
-        {announcements.filter(a=>a.audience==='all'||a.audience==='parent').map(a=>(
+        {announcements.map(a=>(
           <div key={a.id} className="card"><div className="card-body" style={{padding:16}}>
             <div style={{fontWeight:600,fontSize:14,marginBottom:6}}>{a.title}</div>
             <p style={{fontSize:13,color:'var(--text-secondary)',marginBottom:8}}>{a.body}</p>
-            <div style={{fontSize:11,color:'var(--text-muted)'}}>By {a.postedBy} · {a.date} · <span className={`badge badge-${a.priority==='high'?'danger':'warning'}`}>{a.priority}</span></div>
+            <div style={{fontSize:11,color:'var(--text-muted)'}}>{a.createdAt ? new Date(a.createdAt).toLocaleDateString() : '—'}</div>
           </div></div>
         ))}
+        {announcements.length === 0 && (
+          <div className="card"><div className="card-body" style={{ textAlign:'center', color:'var(--text-muted)', padding: 40 }}>No notices yet.</div></div>
+        )}
       </div>
     </div>
   );
@@ -479,45 +598,25 @@ function Notices() {
 function AcademicCalendar() {
   const badgeColors = { National:'badge-danger', Festival:'badge-warning', Regional:'badge-purple' };
   const upcoming = holidays.filter(h => new Date(h.date) >= new Date('2026-08-04'));
-  const upcomingExams = exams.filter(e => e.status === 'upcoming');
 
   return (
     <div>
       <div className="page-header"><div className="page-header-left"><h1>Academic Calendar</h1></div></div>
-      <div className="dashboard-grid grid-2">
-        <div className="card">
-          <div className="card-header"><div className="card-title">Upcoming Holidays ({upcoming.length})</div></div>
-          <div className="table-wrapper">
-            <table>
-              <thead><tr><th>Date</th><th>Holiday</th><th>Type</th></tr></thead>
-              <tbody>
-                {upcoming.slice(0,8).map(h=>(
-                  <tr key={h.id}>
-                    <td style={{fontWeight:500}}>{new Date(h.date).toLocaleDateString('en-IN',{day:'numeric',month:'short'})}</td>
-                    <td style={{fontWeight:600}}>{h.name}</td>
-                    <td><span className={`badge ${badgeColors[h.type]}`}>{h.type}</span></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-        <div className="card">
-          <div className="card-header"><div className="card-title">Upcoming Exams</div></div>
-          <div className="table-wrapper">
-            <table>
-              <thead><tr><th>Exam</th><th>Subject</th><th>Date</th></tr></thead>
-              <tbody>
-                {upcomingExams.slice(0,8).map(e=>(
-                  <tr key={e.id}>
-                    <td style={{fontWeight:500}}>{e.name}</td>
-                    <td><span className="badge badge-info">{e.subject}</span></td>
-                    <td style={{fontSize:12}}>{e.date}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+      <div className="card">
+        <div className="card-header"><div className="card-title">Upcoming Holidays ({upcoming.length})</div></div>
+        <div className="table-wrapper">
+          <table>
+            <thead><tr><th>Date</th><th>Holiday</th><th>Type</th></tr></thead>
+            <tbody>
+              {upcoming.slice(0,8).map(h=>(
+                <tr key={h.id}>
+                  <td style={{fontWeight:500}}>{new Date(h.date).toLocaleDateString('en-IN',{day:'numeric',month:'short'})}</td>
+                  <td style={{fontWeight:600}}>{h.name}</td>
+                  <td><span className={`badge ${badgeColors[h.type]}`}>{h.type}</span></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
@@ -526,9 +625,9 @@ function AcademicCalendar() {
 
 /* ── Root ──────────────────────────────────────────────────── */
 export default function ParentDashboard({ activeTab }) {
-  const { currentUser } = useAuth();
+  const { currentUser, myChildren } = useAuth();
   const parent   = currentUser;
-  const children = users.filter(u => parent?.childrenIds?.includes(u.id));
+  const children = myChildren;
 
   const views = {
     dashboard:  <Dashboard parent={parent} children={children} />,

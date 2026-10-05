@@ -4,46 +4,52 @@ import { useAuth } from '../../context/AuthContext';
 
 const SUBJECTS = ['Mathematics', 'Science', 'English', 'History', 'Geography', 'Computer', 'PE', 'Drawing'];
 
+const BLANK = { classId: '', subject: '', title: '', dueDate: '', description: '' };
+
 export default function HomeworkManagement() {
-  const { homework, addHomework, deleteHomework, classes } = useData();
+  const { homework, addHomework, classes } = useData();
   const { currentUser } = useAuth();
   const isTeacher = currentUser?.role === 'teacher';
 
-  const myClasses    = isTeacher ? (currentUser.classesHandled || []) : classes.map(c => c.name);
-  const initSubject  = isTeacher ? (currentUser.subject || '') : '';
-  const blankForm    = { title: '', class: myClasses[0] || '', subject: initSubject, dueDate: '', description: '' };
-
-  const [showForm,      setShowForm]      = useState(false);
-  const [form,          setForm]          = useState(blankForm);
-  const [deleteConfirm, setDeleteConfirm] = useState(null);
-  const [filterClass,   setFilterClass]   = useState('all');
+  const [showForm,     setShowForm]     = useState(false);
+  const [form,         setForm]         = useState(BLANK);
+  const [filterClass,  setFilterClass]  = useState('all');
+  const [submitting,   setSubmitting]   = useState(false);
+  const [submitError,  setSubmitError]  = useState('');
 
   const set   = (k, v) => setForm(f => ({ ...f, [k]: v }));
-  const reset = () => { setForm(blankForm); setShowForm(false); };
+  const reset = () => { setForm(BLANK); setShowForm(false); setSubmitError(''); };
 
-  const today = new Date().toISOString().slice(0, 10);
+  const classNameFor = (classId) => {
+    const cls = classes.find(c => String(c.id) === String(classId));
+    return cls ? `${cls.gradeLevel}${cls.section}` : classId;
+  };
 
-  const submit = () => {
-    if (!form.title.trim() || !form.class || !form.dueDate) return;
-    addHomework({
-      subject:      form.subject || initSubject,
-      title:        form.title,
-      class:        form.class,
-      assignedBy:   currentUser?.name || '',
-      assignedDate: today,
-      dueDate:      form.dueDate,
-      description:  form.description,
-      status:       'pending',
-      grade:        null,
-    });
-    reset();
+  const submit = async () => {
+    if (!form.title.trim() || !form.classId || !form.subject || !form.dueDate) return;
+    setSubmitting(true);
+    setSubmitError('');
+    try {
+      await addHomework({
+        classId:     Number(form.classId),
+        subject:     form.subject,
+        title:       form.title,
+        description: form.description,
+        dueDate:     form.dueDate,
+      });
+      reset();
+    } catch (err) {
+      setSubmitError(err.message || 'Failed to create assignment');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const displayHW = isTeacher
-    ? homework.filter(h => h.assignedBy === currentUser?.name)
+    ? homework.filter(h => h.createdByStaffId === currentUser?.staffId)
     : homework;
 
-  const filtered = filterClass === 'all' ? displayHW : displayHW.filter(h => h.class === filterClass);
+  const filtered = filterClass === 'all' ? displayHW : displayHW.filter(h => String(h.classId) === filterClass);
 
   return (
     <div>
@@ -53,10 +59,10 @@ export default function HomeworkManagement() {
           <p>{filtered.length} assignments</p>
         </div>
         <div className="page-header-actions">
-          <select className="form-control" style={{ width: 120 }}
+          <select className="form-control" style={{ width: 140 }}
             value={filterClass} onChange={e => setFilterClass(e.target.value)}>
             <option value="all">All Classes</option>
-            {myClasses.map(c => <option key={c} value={c}>Class {c}</option>)}
+            {classes.map(c => <option key={c.id} value={String(c.id)}>Class {c.gradeLevel}{c.section}</option>)}
           </select>
           {isTeacher && (
             <button className="btn btn-primary" onClick={() => setShowForm(s => !s)}>
@@ -73,6 +79,7 @@ export default function HomeworkManagement() {
             <button className="btn btn-ghost btn-sm" onClick={reset}>Cancel</button>
           </div>
           <div className="card-body">
+            {submitError && <div className="alert alert-danger mb-12">{submitError}</div>}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
               <div className="form-group">
                 <label className="form-label">Title *</label>
@@ -80,20 +87,17 @@ export default function HomeworkManagement() {
               </div>
               <div className="form-group">
                 <label className="form-label">Class *</label>
-                <select className="form-control" value={form.class} onChange={e => set('class', e.target.value)}>
-                  {myClasses.map(c => <option key={c} value={c}>Class {c}</option>)}
+                <select className="form-control" value={form.classId} onChange={e => set('classId', e.target.value)}>
+                  <option value="">Select class…</option>
+                  {classes.map(c => <option key={c.id} value={c.id}>Class {c.gradeLevel}{c.section}</option>)}
                 </select>
               </div>
               <div className="form-group">
-                <label className="form-label">Subject</label>
-                {isTeacher ? (
-                  <input className="form-control" value={form.subject} readOnly style={{ background: 'var(--bg-app)' }} />
-                ) : (
-                  <select className="form-control" value={form.subject} onChange={e => set('subject', e.target.value)}>
-                    <option value="">Select…</option>
-                    {SUBJECTS.map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                )}
+                <label className="form-label">Subject *</label>
+                <select className="form-control" value={form.subject} onChange={e => set('subject', e.target.value)}>
+                  <option value="">Select…</option>
+                  {SUBJECTS.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
               </div>
               <div className="form-group">
                 <label className="form-label">Due Date *</label>
@@ -105,7 +109,7 @@ export default function HomeworkManagement() {
               <textarea className="form-control" rows={3} value={form.description} onChange={e => set('description', e.target.value)} placeholder="Instructions for students…" />
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button className="btn btn-primary" onClick={submit}>Assign</button>
+              <button className="btn btn-primary" onClick={submit} disabled={submitting}>{submitting ? 'Assigning…' : 'Assign'}</button>
               <button className="btn btn-outline" onClick={reset}>Cancel</button>
             </div>
           </div>
@@ -117,9 +121,7 @@ export default function HomeworkManagement() {
           <table>
             <thead>
               <tr>
-                <th>Subject</th><th>Title</th><th>Class</th><th>Assigned By</th>
-                <th>Assigned</th><th>Due</th><th>Status</th>
-                {isTeacher && <th>Actions</th>}
+                <th>Subject</th><th>Title</th><th>Class</th><th>Due</th>
               </tr>
             </thead>
             <tbody>
@@ -127,31 +129,12 @@ export default function HomeworkManagement() {
                 <tr key={hw.id}>
                   <td>{hw.subject}</td>
                   <td style={{ fontWeight: 500 }}>{hw.title}</td>
-                  <td><span className="badge badge-info">{hw.class}</span></td>
-                  <td style={{ fontSize: 12 }}>{hw.assignedBy}</td>
-                  <td style={{ fontSize: 12 }}>{hw.assignedDate}</td>
+                  <td><span className="badge badge-info">{classNameFor(hw.classId)}</span></td>
                   <td style={{ fontSize: 12 }}>{hw.dueDate}</td>
-                  <td>
-                    <span className={`badge badge-${hw.status === 'graded' ? 'success' : hw.status === 'submitted' ? 'info' : 'warning'}`}>
-                      {hw.status}
-                    </span>
-                  </td>
-                  {isTeacher && (
-                    <td>
-                      {deleteConfirm === hw.id ? (
-                        <div style={{ display: 'flex', gap: 4 }}>
-                          <button className="btn btn-danger btn-sm" onClick={() => { deleteHomework(hw.id); setDeleteConfirm(null); }}>Yes</button>
-                          <button className="btn btn-ghost btn-sm" onClick={() => setDeleteConfirm(null)}>No</button>
-                        </div>
-                      ) : (
-                        <button className="btn btn-danger btn-sm" onClick={() => setDeleteConfirm(hw.id)}>Delete</button>
-                      )}
-                    </td>
-                  )}
                 </tr>
               ))}
               {filtered.length === 0 && (
-                <tr><td colSpan={isTeacher ? 8 : 7} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 24 }}>No assignments found.</td></tr>
+                <tr><td colSpan={4} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 24 }}>No assignments found.</td></tr>
               )}
             </tbody>
           </table>

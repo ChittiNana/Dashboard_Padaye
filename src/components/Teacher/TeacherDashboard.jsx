@@ -1,11 +1,36 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
-import { users, results, timetable, messages } from '../../data/mockData';
+import { users, messages } from '../../data/mockData';
+import * as timetableApi from '../../api/timetableApi';
 import QuestionPaperManagement  from '../Exams/QuestionPaperManagement';
 import AttendanceManagement     from '../Management/AttendanceManagement';
 import HomeworkManagement       from '../Management/HomeworkManagement';
 import NotesManagement          from '../Management/NotesManagement';
+
+const DAY_ORDER = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
+
+function todayDayOfWeek() {
+  return new Date().toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase();
+}
+function todayISO() {
+  return new Date().toISOString().slice(0, 10);
+}
+function dayLabel(day) {
+  return day.charAt(0) + day.slice(1).toLowerCase();
+}
+function classLabel(classId, classes) {
+  const cls = classes.find(c => String(c.id) === String(classId));
+  return cls ? `${cls.gradeLevel}${cls.section}` : (classId ?? '—');
+}
+function formatTime(t) {
+  if (!t) return '';
+  const [h, m] = t.split(':');
+  const hour = Number(h);
+  const period = hour >= 12 ? 'PM' : 'AM';
+  const displayHour = hour % 12 === 0 ? 12 : hour % 12;
+  return `${displayHour}:${m} ${period}`;
+}
 
 function StatCard({ icon, label, value, color }) {
   return (
@@ -21,12 +46,27 @@ function StatCard({ icon, label, value, color }) {
 
 /* ── Dashboard ──────────────────────────────────────────────── */
 function Dashboard({ teacher }) {
-  const { notes, homework, exams } = useData();
+  const { notes, homework, exams, classes } = useData();
   const { allUsers } = useAuth();
-  const myNotes    = notes.filter(n => n.uploadedBy === teacher.name);
-  const myHomework = homework.filter(h => h.assignedBy === teacher.name);
-  const myExams    = exams.filter(e => teacher.classesHandled?.includes(e.class) && e.subject === teacher.subject);
-  const myStudents = allUsers.filter(u => u.role === 'student' && teacher.classesHandled?.includes(u.class));
+
+  const [todaySlots,   setTodaySlots]   = useState([]);
+  const [slotsLoading, setSlotsLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    if (!teacher.staffId) { setSlotsLoading(false); return; }
+    timetableApi.getTeacherTimetable(teacher.staffId)
+      .then(data => { if (active) setTodaySlots(data.filter(s => s.dayOfWeek === todayDayOfWeek())); })
+      .catch(() => { if (active) setTodaySlots([]); })
+      .finally(() => { if (active) setSlotsLoading(false); });
+    return () => { active = false; };
+  }, [teacher.staffId]);
+
+  const myClassIds = classes.filter(c => c.classTeacherStaffId === teacher.staffId).map(c => c.id);
+  const myNotes    = notes.filter(n => n.uploadedByStaffId === teacher.staffId);
+  const myHomework = homework.filter(h => h.createdByStaffId === teacher.staffId);
+  const myExams    = exams.filter(e => myClassIds.includes(e.classId));
+  const myStudents = allUsers.filter(u => myClassIds.includes(u.classId));
   const unread     = messages.filter(m => m.toId === teacher.id && !m.read);
 
   return (
@@ -34,49 +74,49 @@ function Dashboard({ teacher }) {
       <div className="page-header">
         <div className="page-header-left">
           <h1>Welcome, {teacher.name} 👋</h1>
-          <p>Subject: {teacher.subject} · Classes: {teacher.classesHandled?.join(', ')}</p>
+          <p>Classes: {myClassIds.length ? myClassIds.map(id => classLabel(id, classes)).join(', ') : '—'}</p>
         </div>
         <span className="badge badge-info">Teacher Portal</span>
       </div>
 
       <div className="stat-grid mb-20">
-        <StatCard icon="🏫" label="My Classes"         value={teacher.classesHandled?.length}   color="bg-blue"   />
-        <StatCard icon="👩‍🎓" label="My Students"       value={myStudents.length}                color="bg-green"  />
-        <StatCard icon="📚" label="Notes Uploaded"     value={myNotes.length}                   color="bg-purple" />
-        <StatCard icon="📝" label="Assignments Given"  value={myHomework.length}                color="bg-orange" />
-        <StatCard icon="📋" label="Exams Scheduled"    value={myExams.length}                   color="bg-teal"   />
-        <StatCard icon="💬" label="Unread Messages"    value={unread.length}                    color="bg-red"    />
+        <StatCard icon="🏫" label="My Classes"         value={myClassIds.length}   color="bg-blue"   />
+        <StatCard icon="👩‍🎓" label="My Students"       value={myStudents.length}  color="bg-green"  />
+        <StatCard icon="📚" label="Notes Uploaded"     value={myNotes.length}      color="bg-purple" />
+        <StatCard icon="📝" label="Assignments Given"  value={myHomework.length}   color="bg-orange" />
+        <StatCard icon="📋" label="Exams Scheduled"    value={myExams.length}      color="bg-teal"   />
+        <StatCard icon="💬" label="Unread Messages"    value={unread.length}       color="bg-red"    />
       </div>
 
       <div className="dashboard-grid grid-2">
         {/* Today's Schedule */}
         <div className="card">
-          <div className="card-header"><div className="card-title">Today's Schedule (Monday)</div></div>
+          <div className="card-header"><div className="card-title">Today's Schedule ({dayLabel(todayDayOfWeek())})</div></div>
           <div className="card-body" style={{ padding: 0 }}>
-            {(timetable['10A']?.Monday || []).filter(p => p.teacher === teacher.name).map(p => (
-              <div key={p.period} style={{ padding:'12px 20px', borderBottom:'1px solid var(--border)', display:'flex', gap: 12, alignItems:'center' }}>
+            {todaySlots.slice().sort((a, b) => a.periodNumber - b.periodNumber).map(p => (
+              <div key={p.id} style={{ padding:'12px 20px', borderBottom:'1px solid var(--border)', display:'flex', gap: 12, alignItems:'center' }}>
                 <div style={{ background:'#ebf8ff', borderRadius: 8, padding:'8px 12px', textAlign:'center', minWidth: 80, flexShrink: 0 }}>
-                  <div style={{ fontSize: 11, fontWeight: 600, color:'#2b6cb0' }}>{p.time.split('-')[0]}</div>
-                  <div style={{ fontSize: 10, color:'#4a90d9' }}>{p.time.split('-')[1]}</div>
+                  <div style={{ fontSize: 11, fontWeight: 600, color:'#2b6cb0' }}>{formatTime(p.startTime)}</div>
+                  <div style={{ fontSize: 10, color:'#4a90d9' }}>{formatTime(p.endTime)}</div>
                 </div>
                 <div>
                   <div style={{ fontWeight: 600 }}>{p.subject}</div>
-                  <div style={{ fontSize: 12, color:'var(--text-muted)' }}>Period {p.period} · Class 10A</div>
+                  <div style={{ fontSize: 12, color:'var(--text-muted)' }}>Period {p.periodNumber} · Class {classLabel(p.classId, classes)}</div>
                 </div>
               </div>
             ))}
-            {!(timetable['10A']?.Monday || []).find(p => p.teacher === teacher.name) && (
+            {!slotsLoading && todaySlots.length === 0 && (
               <div style={{ padding: 20, textAlign:'center', color:'var(--text-muted)', fontSize: 13 }}>
-                No classes scheduled for today in Class 10A
+                No classes scheduled for today
               </div>
             )}
           </div>
         </div>
 
-        {/* Pending Homework */}
+        {/* Assignments */}
         <div className="card">
           <div className="card-header">
-            <div className="card-title">Assignments Status</div>
+            <div className="card-title">My Assignments</div>
           </div>
           <div className="card-body" style={{ padding: 0 }}>
             {myHomework.map(hw => (
@@ -84,33 +124,37 @@ function Dashboard({ teacher }) {
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
                   <div>
                     <div style={{ fontWeight: 500, fontSize: 13 }}>{hw.title}</div>
-                    <div style={{ fontSize: 11, color:'var(--text-muted)' }}>Due: {hw.dueDate} · Class {hw.class}</div>
+                    <div style={{ fontSize: 11, color:'var(--text-muted)' }}>Due: {hw.dueDate} · Class {classLabel(hw.classId, classes)}</div>
                   </div>
-                  <span className={`badge badge-${hw.status === 'graded' ? 'success' : hw.status === 'submitted' ? 'info' : 'warning'}`}>
-                    {hw.status}
-                  </span>
+                  <span className="badge badge-info">{hw.subject}</span>
                 </div>
               </div>
             ))}
+            {myHomework.length === 0 && (
+              <div style={{ padding: 20, textAlign:'center', color:'var(--text-muted)', fontSize: 13 }}>No assignments given yet</div>
+            )}
           </div>
         </div>
 
         {/* Upcoming Exams */}
         <div className="card">
-          <div className="card-header"><div className="card-title">My Subject Exams</div></div>
+          <div className="card-header"><div className="card-title">My Classes' Exams</div></div>
           <div className="card-body" style={{ padding: 0 }}>
-            {exams.filter(e => e.subject === teacher.subject).slice(0, 5).map(e => (
+            {myExams.slice(0, 5).map(e => (
               <div key={e.id} style={{ padding:'10px 20px', borderBottom:'1px solid var(--border)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
                 <div>
-                  <div style={{ fontWeight: 500, fontSize: 13 }}>{e.name}</div>
-                  <div style={{ fontSize: 11, color:'var(--text-muted)' }}>{e.date} · {e.time} · {e.room}</div>
+                  <div style={{ fontWeight: 500, fontSize: 13 }}>{e.subject}</div>
+                  <div style={{ fontSize: 11, color:'var(--text-muted)' }}>{e.examDate}</div>
                 </div>
                 <div style={{ textAlign:'right' }}>
-                  <span className="badge badge-info">{e.class}</span>
+                  <span className="badge badge-info">{classLabel(e.classId, classes)}</span>
                   <div style={{ fontSize: 11, color:'var(--text-muted)', marginTop: 2 }}>Max: {e.maxMarks}</div>
                 </div>
               </div>
             ))}
+            {myExams.length === 0 && (
+              <div style={{ padding: 20, textAlign:'center', color:'var(--text-muted)', fontSize: 13 }}>No exams scheduled</div>
+            )}
           </div>
         </div>
 
@@ -144,39 +188,33 @@ function Dashboard({ teacher }) {
 
 /* ── My Classes ─────────────────────────────────────────────── */
 function MyClasses({ teacher }) {
-  const { classes, attendance } = useData();
+  const { classes } = useData();
   const { allUsers } = useAuth();
-  const myClasses = classes.filter(c => teacher.classesHandled?.includes(c.name));
+  const myClasses = classes.filter(c => c.classTeacherStaffId === teacher.staffId);
 
   return (
     <div>
       <div className="page-header">
         <div className="page-header-left">
           <h1>My Classes</h1>
-          <p>Classes you teach — {teacher.subject}</p>
+          <p>Classes you are the class teacher for</p>
         </div>
       </div>
       <div className="dashboard-grid grid-3">
         {myClasses.map(cls => {
-          const studentCount = allUsers.filter(u => u.role === 'student' && u.class === cls.name).length;
-          const attRec = attendance.filter(a => a.class === cls.name);
-          const avgAtt = attRec.length ? Math.round(attRec.filter(a => a.status === 'Present').length / attRec.length * 100) : 0;
+          const studentCount = allUsers.filter(u => u.classId === cls.id).length;
 
           return (
             <div key={cls.id} className="card">
               <div className="card-body">
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: 16 }}>
-                  <div style={{ fontWeight: 700, fontSize: 22 }}>Class {cls.name}</div>
-                  <span className="badge badge-info">{cls.room}</span>
+                  <div style={{ fontWeight: 700, fontSize: 22 }}>Class {cls.gradeLevel}{cls.section}</div>
+                  <span className={`badge badge-${cls.active ? 'success' : 'gray'}`}>{cls.active ? 'Active' : 'Inactive'}</span>
                 </div>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap: 8, marginBottom: 14 }}>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr', gap: 8, marginBottom: 14 }}>
                   <div style={{ background:'#f0fff4', borderRadius: 8, padding:'8px 10px', textAlign:'center' }}>
                     <div style={{ fontSize: 22, fontWeight: 700 }}>{studentCount}</div>
                     <div style={{ fontSize: 11, color:'var(--text-muted)' }}>Students</div>
-                  </div>
-                  <div style={{ background:'#ebf8ff', borderRadius: 8, padding:'8px 10px', textAlign:'center' }}>
-                    <div style={{ fontSize: 22, fontWeight: 700, color: avgAtt < 75 ? 'var(--danger)' : 'var(--success)' }}>{avgAtt}%</div>
-                    <div style={{ fontSize: 11, color:'var(--text-muted)' }}>Avg Attendance</div>
                   </div>
                 </div>
                 <div style={{ display:'flex', gap: 8 }}>
@@ -187,6 +225,11 @@ function MyClasses({ teacher }) {
             </div>
           );
         })}
+        {myClasses.length === 0 && (
+          <div className="card"><div className="card-body" style={{ textAlign:'center', color:'var(--text-muted)' }}>
+            You are not the class teacher for any class.
+          </div></div>
+        )}
       </div>
     </div>
   );
@@ -194,30 +237,37 @@ function MyClasses({ teacher }) {
 
 /* ── Grade Book ────────────────────────────────────────────── */
 function GradeBook({ teacher }) {
-  const { exams } = useData();
+  const { classes, exams, results } = useData();
   const { allUsers } = useAuth();
-  const myResults = results.filter(r => r.subject === teacher.subject);
+  const myClassIds = classes.filter(c => c.classTeacherStaffId === teacher.staffId).map(c => c.id);
+  const myResults = results.filter(r => {
+    const student = allUsers.find(u => u.id === r.studentId);
+    return student && myClassIds.includes(student.classId);
+  });
 
   return (
     <div>
       <div className="page-header">
-        <div className="page-header-left"><h1>Grade Book — {teacher.subject}</h1></div>
+        <div className="page-header-left"><h1>Grade Book — My Classes</h1></div>
       </div>
       <div className="card">
         <div className="table-wrapper">
           <table>
-            <thead><tr><th>Student</th><th>Exam</th><th>Marks Obtained</th><th>Max Marks</th><th>Percentage</th><th>Grade</th><th>Remarks</th></tr></thead>
+            <thead><tr><th>Student</th><th>Subject</th><th>Exam Date</th><th>Marks Obtained</th><th>Max Marks</th><th>Percentage</th><th>Grade</th></tr></thead>
             <tbody>
-              {myResults.map((r, i) => {
+              {myResults.map(r => {
                 const pct = Math.round(r.marksObtained / r.maxMarks * 100);
+                const st = allUsers.find(u => u.id === r.studentId);
+                const exam = exams.find(e => e.id === r.examId);
                 return (
-                  <tr key={i}>
+                  <tr key={r.id}>
                     <td>
                       <div style={{ display:'flex', alignItems:'center', gap: 8 }}>
-                        {(() => { const st = allUsers.find(u => u.id === r.studentId); return <><span className="avatar avatar-sm role-student">{st?.avatar}</span>{st?.name}</>; })()}
+                        <span className="avatar avatar-sm role-student">{st?.avatar}</span>{st?.name}
                       </div>
                     </td>
-                    <td>{exams.find(e => e.id === r.examId)?.name}</td>
+                    <td>{r.subject}</td>
+                    <td>{exam?.examDate ?? '—'}</td>
                     <td style={{ fontWeight: 600 }}>{r.marksObtained}</td>
                     <td>{r.maxMarks}</td>
                     <td>
@@ -238,10 +288,12 @@ function GradeBook({ teacher }) {
                         {r.grade}
                       </div>
                     </td>
-                    <td><span className="badge badge-gray">{r.remarks}</span></td>
                   </tr>
                 );
               })}
+              {myResults.length === 0 && (
+                <tr><td colSpan={7} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 24 }}>No results found for your classes.</td></tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -284,59 +336,84 @@ function HolidayView() {
 
 /* ── Timetable ─────────────────────────────────────────────── */
 function TeacherTimetable({ teacher }) {
-  const days = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const { classes } = useData();
+  const [slots,   setSlots]   = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error,   setError]   = useState('');
+
+  useEffect(() => {
+    let active = true;
+    if (!teacher.staffId) { setLoading(false); return; }
+    timetableApi.getTeacherTimetable(teacher.staffId)
+      .then(data => { if (active) setSlots(data); })
+      .catch(err => { if (active) setError(err.message || 'Failed to load timetable'); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [teacher.staffId]);
+
+  const byDay = DAY_ORDER.map(day => ({
+    day,
+    periods: slots.filter(s => s.dayOfWeek === day).sort((a, b) => a.periodNumber - b.periodNumber),
+  }));
+
   return (
     <div>
       <div className="page-header"><div className="page-header-left"><h1>My Timetable</h1></div></div>
-      {days.map(day => {
-        const periods = (timetable['10A']?.[day] || []).filter(p => p.teacher === teacher.name);
-        return periods.length > 0 ? (
-          <div key={day} className="card mb-12">
-            <div className="card-header"><div className="card-title">{day}</div></div>
-            <div className="card-body" style={{ padding: 0 }}>
-              {periods.map(p => (
-                <div key={p.period} style={{ padding:'12px 20px', borderBottom:'1px solid var(--border)', display:'flex', gap: 12, alignItems:'center' }}>
-                  <div style={{ background:'#ebf8ff', borderRadius: 8, padding:'8px 16px', textAlign:'center', flexShrink: 0 }}>
-                    <div style={{ fontSize: 12, fontWeight: 700, color:'#2b6cb0' }}>{p.time}</div>
-                  </div>
-                  <div>
-                    <div style={{ fontWeight: 600 }}>{p.subject}</div>
-                    <div style={{ fontSize: 12, color:'var(--text-muted)' }}>Class 10A · Period {p.period}</div>
-                  </div>
+      {error && <div className="alert alert-danger mb-12">{error}</div>}
+      {!loading && slots.length === 0 && !error && (
+        <div className="card"><div className="card-body" style={{ textAlign:'center', color:'var(--text-muted)' }}>
+          No timetable slots assigned yet.
+        </div></div>
+      )}
+      {byDay.map(({ day, periods }) => periods.length > 0 ? (
+        <div key={day} className="card mb-12">
+          <div className="card-header"><div className="card-title">{dayLabel(day)}</div></div>
+          <div className="card-body" style={{ padding: 0 }}>
+            {periods.map(p => (
+              <div key={p.id} style={{ padding:'12px 20px', borderBottom:'1px solid var(--border)', display:'flex', gap: 12, alignItems:'center' }}>
+                <div style={{ background:'#ebf8ff', borderRadius: 8, padding:'8px 16px', textAlign:'center', flexShrink: 0 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color:'#2b6cb0' }}>{formatTime(p.startTime)} – {formatTime(p.endTime)}</div>
                 </div>
-              ))}
-            </div>
+                <div>
+                  <div style={{ fontWeight: 600 }}>{p.subject}</div>
+                  <div style={{ fontSize: 12, color:'var(--text-muted)' }}>Class {classLabel(p.classId, classes)} · Period {p.periodNumber}</div>
+                </div>
+              </div>
+            ))}
           </div>
-        ) : null;
-      })}
+        </div>
+      ) : null)}
     </div>
   );
 }
 
 /* ── Exams ─────────────────────────────────────────────────── */
 function ExamsView({ teacher }) {
-  const { exams } = useData();
-  const myExams = exams.filter(e => e.subject === teacher.subject);
+  const { classes, exams } = useData();
+  const myClassIds = classes.filter(c => c.classTeacherStaffId === teacher.staffId).map(c => c.id);
+  const myExams = exams.filter(e => myClassIds.includes(e.classId));
+  const statusFor = (e) => (e.examDate && e.examDate < todayISO() ? 'completed' : 'upcoming');
+
   return (
     <div>
-      <div className="page-header"><div className="page-header-left"><h1>Exams — {teacher.subject}</h1></div></div>
+      <div className="page-header"><div className="page-header-left"><h1>Exams — My Classes</h1></div></div>
       <div className="card">
         <div className="table-wrapper">
           <table>
-            <thead><tr><th>Exam</th><th>Class</th><th>Date</th><th>Time</th><th>Duration</th><th>Max Marks</th><th>Room</th><th>Status</th></tr></thead>
+            <thead><tr><th>Subject</th><th>Class</th><th>Date</th><th>Max Marks</th><th>Status</th></tr></thead>
             <tbody>
               {myExams.map(e => (
                 <tr key={e.id}>
-                  <td style={{ fontWeight: 500 }}>{e.name}</td>
-                  <td><span className="badge badge-info">{e.class}</span></td>
-                  <td>{e.date}</td>
-                  <td>{e.time}</td>
-                  <td>{e.duration}</td>
+                  <td style={{ fontWeight: 500 }}>{e.subject}</td>
+                  <td><span className="badge badge-info">{classLabel(e.classId, classes)}</span></td>
+                  <td>{e.examDate}</td>
                   <td>{e.maxMarks}</td>
-                  <td>{e.room}</td>
-                  <td><span className={`badge badge-${e.status === 'upcoming' ? 'warning' : 'success'}`}>{e.status}</span></td>
+                  <td><span className={`badge badge-${statusFor(e) === 'upcoming' ? 'warning' : 'success'}`}>{statusFor(e)}</span></td>
                 </tr>
               ))}
+              {myExams.length === 0 && (
+                <tr><td colSpan={5} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 24 }}>No exams found for your classes.</td></tr>
+              )}
             </tbody>
           </table>
         </div>

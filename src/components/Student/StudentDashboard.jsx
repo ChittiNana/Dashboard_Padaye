@@ -1,24 +1,65 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { attendance, notes, homework, exams, examPapers, results, timetable, holidays, announcements } from '../../data/mockData';
+import { useData } from '../../context/DataContext';
+import * as attendanceApi from '../../api/attendanceApi';
+import * as timetableApi from '../../api/timetableApi';
+import * as academicsApi from '../../api/academicsApi';
+import { holidays } from '../../data/mockData';
+
+const DAY_ORDER = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
+
+function todayDayOfWeek() {
+  return new Date().toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase();
+}
+function todayISO() {
+  return new Date().toISOString().slice(0, 10);
+}
+function dayLabel(day) {
+  return day.charAt(0) + day.slice(1).toLowerCase();
+}
+function formatTime(t) {
+  if (!t) return '';
+  const [h, m] = t.split(':');
+  const hour = Number(h);
+  const period = hour >= 12 ? 'PM' : 'AM';
+  const displayHour = hour % 12 === 0 ? 12 : hour % 12;
+  return `${displayHour}:${m} ${period}`;
+}
 
 /* ── Dashboard ──────────────────────────────────────────────── */
 function Dashboard({ student }) {
-  const myAtt = attendance.filter(a => a.studentId === student.id);
-  const presentDays = myAtt.filter(a => a.status === 'Present').length;
-  const attPct = myAtt.length ? Math.round((presentDays + myAtt.filter(a=>a.status==='Late').length * 0.5) / myAtt.length * 100) : 0;
-  const myHW    = homework.filter(h => h.class === student.class && h.status === 'pending');
-  const myExams = exams.filter(e => e.class === student.class && e.status === 'upcoming');
-  const today   = 'Monday';
-  const todayClasses = (timetable[student.class]?.[today] || []).filter(p => p.subject !== 'Break' && p.subject !== 'Lunch');
-  const myResults = results.filter(r => r.studentId === student.id);
+  const { homework, exams, announcements } = useData();
+  const [attSummary,   setAttSummary]   = useState(null);
+  const [myResults,    setMyResults]    = useState([]);
+  const [todaySlots,   setTodaySlots]   = useState([]);
+  const [slotsLoading, setSlotsLoading] = useState(true);
+
+  useEffect(() => {
+    if (!student.studentId) return;
+    attendanceApi.getStudentAttendance(student.studentId).then(setAttSummary).catch(() => setAttSummary(null));
+    academicsApi.getResultsByStudent(student.studentId).then(setMyResults).catch(() => setMyResults([]));
+  }, [student.studentId]);
+
+  useEffect(() => {
+    let active = true;
+    if (!student.classId) { setSlotsLoading(false); return; }
+    timetableApi.getClassTimetable(student.classId)
+      .then(data => { if (active) setTodaySlots(data.filter(s => s.dayOfWeek === todayDayOfWeek())); })
+      .catch(() => { if (active) setTodaySlots([]); })
+      .finally(() => { if (active) setSlotsLoading(false); });
+    return () => { active = false; };
+  }, [student.classId]);
+
+  const attPct  = attSummary?.attendancePercentage ?? 0;
+  const myHW    = homework.filter(h => h.classId === student.classId);
+  const myExams = exams.filter(e => e.classId === student.classId && e.examDate >= todayISO());
 
   return (
     <div>
       <div className="page-header">
         <div className="page-header-left">
-          <h1>Hey, {student.name.split(' ')[0]}! 👋</h1>
-          <p>Class {student.class} · Roll No. {student.rollNo}</p>
+          <h1>Hey, {student.name?.split(' ')[0]}! 👋</h1>
+          <p>Admission No. {student.admissionNumber ?? '—'}</p>
         </div>
         <span className="badge badge-success">Student Portal</span>
       </div>
@@ -39,7 +80,7 @@ function Dashboard({ student }) {
           <div className="stat-icon bg-orange">📝</div>
           <div className="stat-info">
             <div className="stat-value">{myHW.length}</div>
-            <div className="stat-label">Pending Tasks</div>
+            <div className="stat-label">Assignments</div>
           </div>
         </div>
         <div className="stat-card">
@@ -61,30 +102,32 @@ function Dashboard({ student }) {
       <div className="dashboard-grid grid-2">
         {/* Today's Classes */}
         <div className="card">
-          <div className="card-header"><div className="card-title">Today's Schedule ({today})</div></div>
+          <div className="card-header"><div className="card-title">Today's Schedule ({dayLabel(todayDayOfWeek())})</div></div>
           <div className="card-body" style={{ padding: 0 }}>
-            {todayClasses.map(p => {
-              const colors = { Mathematics:'#ebf8ff', Science:'#f0fff4', English:'#faf5ff', History:'#fffaf0', Geography:'#e6fffa', Computer:'#fff5f5', PE:'#f0f4ff', Drawing:'#fff0f5', Library:'#f7fafc' };
+            {todaySlots.slice().sort((a, b) => a.periodNumber - b.periodNumber).map(p => {
+              const colors = { Mathematics:'#ebf8ff', Science:'#f0fff4', English:'#faf5ff', History:'#fffaf0', Geography:'#e6fffa', Computer:'#fff5f5', PE:'#f0f4ff', Drawing:'#fff0f5' };
               return (
-                <div key={p.period} style={{ padding:'10px 20px', borderBottom:'1px solid var(--border)', display:'flex', gap: 10, alignItems:'center' }}>
+                <div key={p.id} style={{ padding:'10px 20px', borderBottom:'1px solid var(--border)', display:'flex', gap: 10, alignItems:'center' }}>
                   <div style={{ background: colors[p.subject] || '#f7fafc', borderRadius: 8, padding:'8px 12px', minWidth: 88, textAlign:'center', flexShrink: 0 }}>
-                    <div style={{ fontSize: 11, fontWeight: 700 }}>{p.time.split('-')[0]}</div>
-                    <div style={{ fontSize: 10, color:'var(--text-muted)' }}>P{p.period}</div>
+                    <div style={{ fontSize: 11, fontWeight: 700 }}>{formatTime(p.startTime)}</div>
+                    <div style={{ fontSize: 10, color:'var(--text-muted)' }}>P{p.periodNumber}</div>
                   </div>
                   <div>
                     <div style={{ fontWeight: 600 }}>{p.subject}</div>
-                    <div style={{ fontSize: 12, color:'var(--text-muted)' }}>{p.teacher}</div>
                   </div>
                 </div>
               );
             })}
+            {!slotsLoading && todaySlots.length === 0 && (
+              <div style={{ padding: 24, textAlign:'center', color:'var(--text-muted)', fontSize: 13 }}>No classes scheduled for today</div>
+            )}
           </div>
         </div>
 
-        {/* Pending Homework */}
+        {/* Homework */}
         <div className="card">
           <div className="card-header">
-            <div className="card-title">Pending Homework</div>
+            <div className="card-title">Homework</div>
             {myHW.length > 0 && <span className="badge badge-warning">{myHW.length}</span>}
           </div>
           <div className="card-body" style={{ padding: 0 }}>
@@ -97,7 +140,6 @@ function Dashboard({ student }) {
                     <div style={{ fontWeight: 500, fontSize: 13 }}>{hw.title}</div>
                     <div style={{ fontSize: 11, color:'var(--text-muted)' }}>{hw.subject} · Due: {hw.dueDate}</div>
                   </div>
-                  <span className="badge badge-warning">Due soon</span>
                 </div>
               </div>
             ))}
@@ -110,16 +152,16 @@ function Dashboard({ student }) {
           <div className="card-body" style={{ padding: 0 }}>
             {myExams.slice(0, 5).map(e => (
               <div key={e.id} style={{ padding:'10px 20px', borderBottom:'1px solid var(--border)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                <div>
-                  <div style={{ fontWeight: 600 }}>{e.subject}</div>
-                  <div style={{ fontSize: 12, color:'var(--text-muted)' }}>{e.name} · {e.date} at {e.time}</div>
-                </div>
+                <div style={{ fontWeight: 600 }}>{e.subject}</div>
                 <div style={{ textAlign:'right' }}>
-                  <div style={{ fontSize: 13, fontWeight: 600 }}>{e.room}</div>
-                  <div style={{ fontSize: 11, color:'var(--text-muted)' }}>{e.duration}</div>
+                  <div style={{ fontSize: 13, fontWeight: 600 }}>{e.examDate}</div>
+                  <div style={{ fontSize: 11, color:'var(--text-muted)' }}>Max: {e.maxMarks}</div>
                 </div>
               </div>
             ))}
+            {myExams.length === 0 && (
+              <div style={{ padding: 24, textAlign:'center', color:'var(--text-muted)', fontSize: 13 }}>No upcoming exams</div>
+            )}
           </div>
         </div>
 
@@ -127,10 +169,10 @@ function Dashboard({ student }) {
         <div className="card">
           <div className="card-header"><div className="card-title">School Notices</div></div>
           <div className="card-body" style={{ padding:'8px 0' }}>
-            {announcements.filter(a => a.audience === 'all').slice(0, 4).map(a => (
+            {announcements.slice(0, 4).map(a => (
               <div key={a.id} style={{ padding:'10px 20px', borderBottom:'1px solid var(--border)' }}>
                 <div style={{ fontWeight: 500, fontSize: 13 }}>{a.title}</div>
-                <div style={{ fontSize: 11, color:'var(--text-muted)' }}>{a.date}</div>
+                <div style={{ fontSize: 11, color:'var(--text-muted)' }}>{a.createdAt ? new Date(a.createdAt).toLocaleDateString() : '—'}</div>
               </div>
             ))}
           </div>
@@ -142,61 +184,61 @@ function Dashboard({ student }) {
 
 /* ── Timetable ─────────────────────────────────────────────── */
 function Timetable({ student }) {
-  const [selectedDay, setSelectedDay] = useState('Monday');
-  const days = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-  const subjectColors = {
-    Mathematics:'bg-blue', Science:'bg-green', English:'bg-purple',
-    History:'bg-orange', Geography:'bg-teal', Computer:'bg-red',
-    PE:'bg-yellow', Drawing:'bg-pink', Library:'bg-gray',
-  };
+  const [slots,       setSlots]       = useState([]);
+  const [loading,     setLoading]     = useState(true);
+  const [error,       setError]       = useState('');
+  const [selectedDay, setSelectedDay] = useState(todayDayOfWeek());
 
-  const schedule = timetable[student.class] || {};
-  const daySchedule = schedule[selectedDay] || [];
+  useEffect(() => {
+    let active = true;
+    if (!student.classId) { setLoading(false); return; }
+    timetableApi.getClassTimetable(student.classId)
+      .then(data => { if (active) setSlots(data); })
+      .catch(err => { if (active) setError(err.message || 'Failed to load timetable'); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [student.classId]);
+
+  const daySchedule = slots.filter(s => s.dayOfWeek === selectedDay).sort((a, b) => a.periodNumber - b.periodNumber);
 
   return (
     <div>
       <div className="page-header">
         <div className="page-header-left">
           <h1>Weekly Timetable</h1>
-          <p>Class {student.class}</p>
         </div>
       </div>
 
       <div className="tabs">
-        {days.map(d => (
+        {DAY_ORDER.map(d => (
           <div key={d} className={`tab ${selectedDay === d ? 'active' : ''}`}
-            onClick={() => setSelectedDay(d)}>{d}</div>
+            onClick={() => setSelectedDay(d)}>{dayLabel(d)}</div>
         ))}
       </div>
 
+      {error && <div className="alert alert-danger mb-12">{error}</div>}
+
       <div className="card">
         <div className="card-body" style={{ padding: 0 }}>
-          {daySchedule.map(p => {
-            const isBreak = ['Break','Lunch','Library'].includes(p.subject);
-            return (
-              <div key={p.period} style={{
-                display:'flex', gap: 12, padding:'14px 20px',
-                borderBottom:'1px solid var(--border)',
-                background: isBreak ? '#fafafa' : '#fff',
-                alignItems:'center',
-              }}>
-                <div style={{ width: 56, textAlign:'center', flexShrink: 0 }}>
-                  <div style={{ fontSize: 10, color:'var(--text-muted)', fontWeight: 600 }}>P{p.period}</div>
-                  <div style={{ fontSize: 11, fontWeight: 700 }}>{p.time.split('-')[0]}</div>
-                  <div style={{ fontSize: 10, color:'var(--text-muted)' }}>{p.time.split('-')[1]}</div>
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: isBreak ? 400 : 600, color: isBreak ? 'var(--text-muted)' : 'var(--text-primary)' }}>
-                    {p.subject}
-                  </div>
-                  {!isBreak && <div style={{ fontSize: 12, color:'var(--text-muted)', marginTop: 2 }}>{p.teacher}</div>}
-                </div>
-                {!isBreak && (
-                  <div style={{ fontSize: 11, color:'var(--text-muted)' }}>{p.time}</div>
-                )}
+          {daySchedule.map(p => (
+            <div key={p.id} style={{
+              display:'flex', gap: 12, padding:'14px 20px',
+              borderBottom:'1px solid var(--border)',
+              alignItems:'center',
+            }}>
+              <div style={{ width: 56, textAlign:'center', flexShrink: 0 }}>
+                <div style={{ fontSize: 10, color:'var(--text-muted)', fontWeight: 600 }}>P{p.periodNumber}</div>
+                <div style={{ fontSize: 11, fontWeight: 700 }}>{formatTime(p.startTime)}</div>
+                <div style={{ fontSize: 10, color:'var(--text-muted)' }}>{formatTime(p.endTime)}</div>
               </div>
-            );
-          })}
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 600 }}>{p.subject}</div>
+              </div>
+            </div>
+          ))}
+          {!loading && daySchedule.length === 0 && (
+            <div style={{ padding: 24, textAlign:'center', color:'var(--text-muted)', fontSize: 13 }}>No classes scheduled for this day.</div>
+          )}
         </div>
       </div>
     </div>
@@ -205,8 +247,9 @@ function Timetable({ student }) {
 
 /* ── Study Materials ────────────────────────────────────────── */
 function StudyMaterials({ student }) {
+  const { notes } = useData();
   const [filterSubject, setFilterSubject] = useState('all');
-  const myNotes = notes.filter(n => n.class === student.class);
+  const myNotes = notes.filter(n => n.classId === student.classId);
   const subjects = [...new Set(myNotes.map(n => n.subject))];
   const filtered = filterSubject === 'all' ? myNotes : myNotes.filter(n => n.subject === filterSubject);
 
@@ -224,7 +267,7 @@ function StudyMaterials({ student }) {
       <div className="page-header">
         <div className="page-header-left">
           <h1>Study Materials</h1>
-          <p>Notes and resources for Class {student.class}</p>
+          <p>Notes and resources for your class</p>
         </div>
         <select className="form-control" style={{ width: 160 }}
           value={filterSubject} onChange={e => setFilterSubject(e.target.value)}>
@@ -252,7 +295,7 @@ function StudyMaterials({ student }) {
       <div className="card">
         <div className="table-wrapper">
           <table>
-            <thead><tr><th>Subject</th><th>Title</th><th>Uploaded By</th><th>Date</th><th>Type</th><th>Pages</th><th>Action</th></tr></thead>
+            <thead><tr><th>Subject</th><th>Title</th><th>File</th></tr></thead>
             <tbody>
               {filtered.map(n => (
                 <tr key={n.id}>
@@ -260,15 +303,14 @@ function StudyMaterials({ student }) {
                     <span className="badge badge-info">{n.subject}</span>
                   </td>
                   <td style={{ fontWeight: 500 }}>{n.title}</td>
-                  <td style={{ fontSize: 12 }}>{n.uploadedBy}</td>
-                  <td style={{ fontSize: 12 }}>{n.date}</td>
-                  <td><span className="badge badge-gray">{n.fileType}</span></td>
-                  <td>{n.pages}</td>
                   <td>
-                    <button className="btn btn-primary btn-sm">📥 Download</button>
+                    {n.fileUrl ? <a href={n.fileUrl} target="_blank" rel="noreferrer">📥 Open</a> : <span style={{ color:'var(--text-muted)' }}>—</span>}
                   </td>
                 </tr>
               ))}
+              {filtered.length === 0 && (
+                <tr><td colSpan={3} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 24 }}>No materials found.</td></tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -279,55 +321,38 @@ function StudyMaterials({ student }) {
 
 /* ── Homework ───────────────────────────────────────────────── */
 function Homework({ student }) {
-  const [filter, setFilter] = useState('all');
-  const myHW = homework.filter(h => h.class === student.class);
-  const filtered = filter === 'all' ? myHW : myHW.filter(h => h.status === filter);
+  const { homework } = useData();
+  const myHW = homework.filter(h => h.classId === student.classId);
 
   return (
     <div>
       <div className="page-header">
         <div className="page-header-left">
           <h1>Homework & Assignments</h1>
-          <p>Class {student.class}</p>
         </div>
       </div>
 
-      <div className="tabs">
-        {['all','pending','submitted','graded'].map(f => (
-          <div key={f} className={`tab ${filter === f ? 'active' : ''}`}
-            onClick={() => setFilter(f)} style={{ textTransform:'capitalize' }}>{f}</div>
-        ))}
-      </div>
-
       <div style={{ display:'grid', gap: 12 }}>
-        {filtered.map(hw => (
+        {myHW.map(hw => (
           <div key={hw.id} className="card">
             <div className="card-body" style={{ padding: 16 }}>
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap: 12 }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display:'flex', alignItems:'center', gap: 8, marginBottom: 6 }}>
-                    <span style={{ fontSize: 16 }}>📝</span>
-                    <span style={{ fontWeight: 700, fontSize: 14 }}>{hw.title}</span>
-                    <span className="badge badge-info">{hw.subject}</span>
-                    <span className={`badge badge-${hw.status === 'graded' ? 'success' : hw.status === 'submitted' ? 'info' : 'warning'}`}>
-                      {hw.status}
-                    </span>
-                  </div>
-                  <p style={{ fontSize: 13, color:'var(--text-secondary)', marginBottom: 8 }}>{hw.description}</p>
-                  <div style={{ display:'flex', gap: 16, fontSize: 12, color:'var(--text-muted)' }}>
-                    <span>📅 Assigned: {hw.assignedDate}</span>
-                    <span>⏰ Due: {hw.dueDate}</span>
-                    <span>👨‍🏫 {hw.assignedBy}</span>
-                    {hw.grade && <span style={{ color:'var(--success)', fontWeight: 600 }}>✓ Grade: {hw.grade}</span>}
-                  </div>
-                </div>
-                {hw.status === 'pending' && (
-                  <button className="btn btn-primary btn-sm">Submit</button>
-                )}
+              <div style={{ display:'flex', alignItems:'center', gap: 8, marginBottom: 6 }}>
+                <span style={{ fontSize: 16 }}>📝</span>
+                <span style={{ fontWeight: 700, fontSize: 14 }}>{hw.title}</span>
+                <span className="badge badge-info">{hw.subject}</span>
+              </div>
+              <p style={{ fontSize: 13, color:'var(--text-secondary)', marginBottom: 8 }}>{hw.description}</p>
+              <div style={{ display:'flex', gap: 16, fontSize: 12, color:'var(--text-muted)' }}>
+                <span>⏰ Due: {hw.dueDate}</span>
               </div>
             </div>
           </div>
         ))}
+        {myHW.length === 0 && (
+          <div className="card"><div className="card-body" style={{ textAlign:'center', color:'var(--text-muted)' }}>
+            No homework assigned yet.
+          </div></div>
+        )}
       </div>
     </div>
   );
@@ -335,16 +360,18 @@ function Homework({ student }) {
 
 /* ── Exam Schedule ──────────────────────────────────────────── */
 function ExamSchedule({ student }) {
+  const { exams } = useData();
   const [filter, setFilter] = useState('upcoming');
-  const myExams = exams.filter(e => e.class === student.class);
-  const filtered = filter === 'all' ? myExams : myExams.filter(e => e.status === filter);
+  const myExams = exams.filter(e => e.classId === student.classId);
+  const statusFor = (e) => (e.examDate && e.examDate < todayISO() ? 'completed' : 'upcoming');
+  const filtered = filter === 'all' ? myExams : myExams.filter(e => statusFor(e) === filter);
 
   return (
     <div>
       <div className="page-header">
         <div className="page-header-left">
           <h1>Exam Schedule</h1>
-          <p>Class {student.class} — {student.name}</p>
+          <p>{student.name}</p>
         </div>
       </div>
 
@@ -363,26 +390,25 @@ function ExamSchedule({ student }) {
       <div className="card">
         <div className="table-wrapper">
           <table>
-            <thead><tr><th>Exam</th><th>Subject</th><th>Date</th><th>Time</th><th>Duration</th><th>Max Marks</th><th>Venue</th><th>Status</th></tr></thead>
+            <thead><tr><th>Subject</th><th>Date</th><th>Max Marks</th><th>Status</th></tr></thead>
             <tbody>
               {filtered.map(e => (
                 <tr key={e.id}>
-                  <td style={{ fontWeight: 600 }}>{e.name}</td>
-                  <td>
+                  <td style={{ fontWeight: 600 }}>
                     <span className="badge badge-info">{e.subject}</span>
                   </td>
-                  <td>{e.date}</td>
-                  <td>{e.time}</td>
-                  <td>{e.duration}</td>
+                  <td>{e.examDate}</td>
                   <td style={{ fontWeight: 600 }}>{e.maxMarks}</td>
-                  <td>{e.room}</td>
                   <td>
-                    <span className={`badge badge-${e.status === 'upcoming' ? 'warning' : 'success'}`}>
-                      {e.status}
+                    <span className={`badge badge-${statusFor(e) === 'upcoming' ? 'warning' : 'success'}`}>
+                      {statusFor(e)}
                     </span>
                   </td>
                 </tr>
               ))}
+              {filtered.length === 0 && (
+                <tr><td colSpan={4} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 24 }}>No exams found.</td></tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -393,35 +419,57 @@ function ExamSchedule({ student }) {
 
 /* ── Past Papers ────────────────────────────────────────────── */
 function PastPapers({ student }) {
-  const papers = examPapers.filter(p => p.class === student.class);
+  const [papers,  setPapers]  = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error,   setError]   = useState('');
+
+  useEffect(() => {
+    let active = true;
+    academicsApi.listQuestionPapers()
+      .then(data => { if (active) setPapers(data); })
+      .catch(err => { if (active) setError(err.message || 'Failed to load question papers'); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, []);
+
+  const myPapers = papers.filter(p => p.classId === student.classId && p.content?.status === 'published');
+  const questionCount = (p) => (p.content?.sections || []).reduce((s, sec) => s + (sec.questions?.length || 0), 0);
 
   return (
     <div>
       <div className="page-header">
         <div className="page-header-left">
           <h1>Past Exam Papers</h1>
-          <p>Previous years' question papers for Class {student.class}</p>
+          <p>Question papers for your class</p>
         </div>
       </div>
+
+      {error && <div className="alert alert-danger mb-12">{error}</div>}
 
       <div className="card">
         <div className="table-wrapper">
           <table>
-            <thead><tr><th>Exam</th><th>Subject</th><th>Year</th><th>Questions</th><th>Max Marks</th><th>Uploaded</th><th>Action</th></tr></thead>
+            <thead><tr><th>Title</th><th>Subject</th><th>Questions</th><th>Max Marks</th><th>Uploaded</th><th>Action</th></tr></thead>
             <tbody>
-              {papers.map(p => (
+              {myPapers.map(p => (
                 <tr key={p.id}>
-                  <td style={{ fontWeight: 600 }}>{p.examName}</td>
+                  <td style={{ fontWeight: 600 }}>{p.title}</td>
                   <td><span className="badge badge-info">{p.subject}</span></td>
-                  <td><span className="badge badge-gray">{p.year}</span></td>
-                  <td>{p.questions} Qs</td>
-                  <td>{p.maxMarks}</td>
-                  <td style={{ fontSize: 12 }}>{p.uploadDate}</td>
+                  <td>{questionCount(p)} Qs</td>
+                  <td>{p.content?.maxMarks ?? '—'}</td>
+                  <td style={{ fontSize: 12 }}>
+                    {p.createdAt ? new Date(p.createdAt).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' }) : '—'}
+                  </td>
                   <td>
-                    <button className="btn btn-primary btn-sm">📥 Download</button>
+                    {p.fileUrl
+                      ? <a className="btn btn-primary btn-sm" href={p.fileUrl} target="_blank" rel="noreferrer">📥 Download</a>
+                      : <span style={{ color:'var(--text-muted)', fontSize: 12 }}>No file</span>}
                   </td>
                 </tr>
               ))}
+              {!loading && myPapers.length === 0 && (
+                <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 24 }}>No question papers found for your class.</td></tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -432,7 +480,18 @@ function PastPapers({ student }) {
 
 /* ── Results ────────────────────────────────────────────────── */
 function Results({ student }) {
-  const myResults = results.filter(r => r.studentId === student.id);
+  const { exams } = useData();
+  const [myResults, setMyResults] = useState([]);
+  const [loading,   setLoading]   = useState(true);
+
+  useEffect(() => {
+    if (!student.studentId) { setLoading(false); return; }
+    academicsApi.getResultsByStudent(student.studentId)
+      .then(setMyResults)
+      .catch(() => setMyResults([]))
+      .finally(() => setLoading(false));
+  }, [student.studentId]);
+
   const avgPct = myResults.length
     ? Math.round(myResults.reduce((s, r) => s + r.marksObtained / r.maxMarks, 0) / myResults.length * 100)
     : 0;
@@ -446,7 +505,7 @@ function Results({ student }) {
         </div>
       </div>
 
-      {myResults.length === 0 ? (
+      {!loading && myResults.length === 0 ? (
         <div className="card">
           <div className="empty-state">
             <div className="empty-state-icon">📊</div>
@@ -483,15 +542,15 @@ function Results({ student }) {
           <div className="card">
             <div className="table-wrapper">
               <table>
-                <thead><tr><th>Exam</th><th>Subject</th><th>Marks</th><th>Out of</th><th>%</th><th>Grade</th><th>Remarks</th></tr></thead>
+                <thead><tr><th>Subject</th><th>Exam Date</th><th>Marks</th><th>Out of</th><th>%</th><th>Grade</th></tr></thead>
                 <tbody>
-                  {myResults.map((r, i) => {
+                  {myResults.map(r => {
                     const exam = exams.find(e => e.id === r.examId);
                     const pct  = Math.round(r.marksObtained / r.maxMarks * 100);
                     return (
-                      <tr key={i}>
-                        <td>{exam?.name}</td>
+                      <tr key={r.id}>
                         <td><span className="badge badge-info">{r.subject}</span></td>
+                        <td>{exam?.examDate ?? '—'}</td>
                         <td style={{ fontWeight: 700, fontSize: 16 }}>{r.marksObtained}</td>
                         <td>{r.maxMarks}</td>
                         <td>
@@ -512,7 +571,6 @@ function Results({ student }) {
                             {r.grade}
                           </div>
                         </td>
-                        <td><span className="badge badge-gray">{r.remarks}</span></td>
                       </tr>
                     );
                   })}
@@ -528,12 +586,25 @@ function Results({ student }) {
 
 /* ── Attendance ─────────────────────────────────────────────── */
 function AttendanceView({ student }) {
-  const myAtt = attendance.filter(a => a.studentId === student.id).sort((a, b) => new Date(b.date) - new Date(a.date));
-  const present = myAtt.filter(a => a.status === 'Present').length;
-  const absent  = myAtt.filter(a => a.status === 'Absent').length;
-  const late    = myAtt.filter(a => a.status === 'Late').length;
-  const total   = myAtt.length;
-  const pct     = total ? Math.round((present + late * 0.5) / total * 100) : 0;
+  const [attSummary, setAttSummary] = useState(null);
+  const [loading,    setLoading]    = useState(false);
+  const [loadError,  setLoadError]  = useState('');
+
+  useEffect(() => {
+    if (!student.studentId) return;
+    setLoading(true);
+    setLoadError('');
+    attendanceApi.getStudentAttendance(student.studentId)
+      .then(setAttSummary)
+      .catch(err => setLoadError(err.message || 'Failed to load attendance.'))
+      .finally(() => setLoading(false));
+  }, [student.studentId]);
+
+  const myAtt   = [...(attSummary?.records || [])].sort((a, b) => new Date(b.date) - new Date(a.date));
+  const present = attSummary?.presentDays ?? 0;
+  const absent  = attSummary?.absentDays ?? 0;
+  const late    = myAtt.filter(a => a.status === 'LATE').length;
+  const pct     = attSummary?.attendancePercentage ?? 0;
 
   return (
     <div>
@@ -591,11 +662,16 @@ function AttendanceView({ student }) {
             <span style={{ display:'flex', alignItems:'center', gap: 4 }}><span className="att-dot att-late"    />Late</span>
           </div>
         </div>
+        {loadError && <div className="alert alert-danger" style={{ margin: 16 }}>{loadError}</div>}
         <div className="table-wrapper">
           <table>
             <thead><tr><th>Date</th><th>Day</th><th>Status</th></tr></thead>
             <tbody>
-              {myAtt.map((a, i) => (
+              {loading ? (
+                <tr><td colSpan={3} style={{ textAlign: 'center', padding: 24 }}>Loading…</td></tr>
+              ) : myAtt.length === 0 ? (
+                <tr><td colSpan={3} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 24 }}>No attendance records found.</td></tr>
+              ) : myAtt.map((a, i) => (
                 <tr key={i}>
                   <td>{a.date}</td>
                   <td style={{ color:'var(--text-muted)', fontSize: 12 }}>
@@ -604,7 +680,7 @@ function AttendanceView({ student }) {
                   <td>
                     <div style={{ display:'flex', alignItems:'center', gap: 6 }}>
                       <span className={`att-dot att-${a.status.toLowerCase()}`} />
-                      <span className={`badge badge-${a.status === 'Present' ? 'success' : a.status === 'Absent' ? 'danger' : 'warning'}`}>
+                      <span className={`badge badge-${a.status === 'PRESENT' ? 'success' : a.status === 'ABSENT' ? 'danger' : 'warning'}`}>
                         {a.status}
                       </span>
                     </div>
@@ -667,22 +743,25 @@ function HolidayList() {
 
 /* ── Notices ────────────────────────────────────────────────── */
 function Notices() {
+  const { announcements } = useData();
   return (
     <div>
       <div className="page-header"><div className="page-header-left"><h1>School Notices</h1></div></div>
       <div style={{ display:'grid', gap: 12 }}>
-        {announcements.filter(a => a.audience === 'all').map(a => (
+        {announcements.map(a => (
           <div key={a.id} className="card">
             <div className="card-body" style={{ padding: 16 }}>
               <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 6 }}>{a.title}</div>
               <p style={{ fontSize: 13, color:'var(--text-secondary)', marginBottom: 8 }}>{a.body}</p>
               <div style={{ fontSize: 11, color:'var(--text-muted)' }}>
-                By {a.postedBy} · {a.date} ·{' '}
-                <span className={`badge badge-${a.priority === 'high' ? 'danger' : 'warning'}`}>{a.priority}</span>
+                {a.createdAt ? new Date(a.createdAt).toLocaleDateString() : '—'}
               </div>
             </div>
           </div>
         ))}
+        {announcements.length === 0 && (
+          <div className="card"><div className="card-body" style={{ textAlign:'center', color:'var(--text-muted)', padding: 40 }}>No notices yet.</div></div>
+        )}
       </div>
     </div>
   );

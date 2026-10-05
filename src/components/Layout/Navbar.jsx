@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { announcements } from '../../data/mockData';
+import { useData } from '../../context/DataContext';
 
 const pageTitles = {
   dashboard:  'Dashboard',
@@ -29,8 +29,9 @@ const pageTitles = {
 
 export default function Navbar({ activeTab, onToggleSidebar }) {
   const { currentUser, logout } = useAuth();
+  const { announcements } = useData();
   const [showNotif, setShowNotif] = useState(false);
-  const unreadCount = announcements.filter(a => a.priority === 'high').length;
+  const unreadCount = announcements.length;
 
   return (
     <header className="navbar">
@@ -71,17 +72,21 @@ export default function Navbar({ activeTab, onToggleSidebar }) {
             </div>
             <div style={{ maxHeight: 320, overflowY: 'auto' }}>
               {announcements.slice(0, 5).map(a => (
-                <div key={a.id} className={`notif-item ${a.priority === 'high' ? 'notif-unread' : ''}`}
-                  style={{ padding: '10px 16px' }}>
-                  <div className={`notif-icon bg-${a.priority === 'high' ? 'orange' : a.priority === 'medium' ? 'blue' : 'teal'}`}>
+                <div key={a.id} className="notif-item" style={{ padding: '10px 16px' }}>
+                  <div className="notif-icon bg-teal">
                     📢
                   </div>
                   <div className="notif-body">
                     <div className="notif-title">{a.title}</div>
-                    <div className="notif-meta">{a.postedBy} · {a.date}</div>
+                    <div className="notif-meta">{a.createdAt ? new Date(a.createdAt).toLocaleDateString() : '—'}</div>
                   </div>
                 </div>
               ))}
+              {announcements.length === 0 && (
+                <div style={{ padding: '16px', fontSize: 12, color: 'var(--text-muted)', textAlign: 'center' }}>
+                  No notifications.
+                </div>
+              )}
             </div>
             <div style={{ padding: '10px 16px', borderTop: '1px solid var(--border)', textAlign: 'center' }}>
               <button style={{ fontSize: 12, color: 'var(--secondary)', fontWeight: 500 }}

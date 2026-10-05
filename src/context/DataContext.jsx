@@ -1,103 +1,238 @@
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { useAuth } from './AuthContext';
+import * as classesApi from '../api/classesApi';
+import * as academicsApi from '../api/academicsApi';
+import * as feeApi from '../api/feeApi';
+import * as communicationApi from '../api/communicationApi';
 import {
-  classes     as initialClasses,
-  exams       as initialExams,
-  announcements as initialAnnouncements,
   holidays    as initialHolidays,
-  fees        as initialFees,
-  homework    as initialHomework,
-  notes       as initialNotes,
-  attendance  as initialAttendance,
-  staffAttendance as initialStaffAttendance,
-  timetable   as initialTimetable,
 } from '../data/mockData';
 
 const DataContext = createContext(null);
+
+const CLASSES_VISIBLE_ROLES   = ['principal', 'headmaster', 'teacher', 'accountant', 'support_staff'];
+const EXAMS_VISIBLE_ROLES     = ['student', 'teacher', 'principal', 'headmaster'];
+const HOMEWORK_VISIBLE_ROLES  = ['student', 'parent', 'teacher'];
+const NOTES_VISIBLE_ROLES     = ['student', 'teacher'];
+const RESULTS_VISIBLE_ROLES   = ['teacher', 'principal', 'headmaster'];
+const FEES_VISIBLE_ROLES      = ['principal', 'accountant'];
 
 const nextId = (arr) =>
   arr.length ? Math.max(...arr.map(x => Number(x.id) || 0)) + 1 : 1;
 
 export function DataProvider({ children }) {
-  const [classes,        setClasses]        = useState(initialClasses);
-  const [exams,          setExams]          = useState(initialExams);
-  const [announcements,  setAnnouncements]  = useState(initialAnnouncements);
+  const { currentUser } = useAuth();
+  const [classes,        setClasses]        = useState([]);
+  const [exams,          setExams]          = useState([]);
+  const [announcements,  setAnnouncements]  = useState([]);
   const [holidays,       setHolidays]       = useState(initialHolidays);
-  const [fees,           setFees]           = useState(initialFees);
-  const [homework,       setHomework]       = useState(initialHomework);
-  const [notes,          setNotes]          = useState(initialNotes);
-  const [attendance,     setAttendance]     = useState(initialAttendance);
-  const [staffAttendance]                   = useState(initialStaffAttendance);
-  const [timetable,      setTimetable]      = useState(initialTimetable);
+  const [fees,           setFees]           = useState([]);
+  const [homework,       setHomework]       = useState([]);
+  const [notes,          setNotes]          = useState([]);
+  const [results,        setResults]        = useState([]);
 
   // ── Classes ──────────────────────────────────────────────────────────────────
-  const addClass    = (d) => setClasses(p => [...p, { ...d, id: `cls-${Date.now()}` }]);
-  const updateClass = (id, d) => setClasses(p => p.map(c => c.id === id ? { ...c, ...d } : c));
-  const deleteClass = (id) => setClasses(p => p.filter(c => c.id !== id));
+  const loadClasses = useCallback(async () => {
+    if (!currentUser || !CLASSES_VISIBLE_ROLES.includes(currentUser.role)) {
+      setClasses([]);
+      return;
+    }
+    try {
+      const data = await classesApi.listClasses();
+      setClasses(data);
+    } catch {
+      setClasses([]);
+    }
+  }, [currentUser]);
+
+  useEffect(() => { loadClasses(); }, [loadClasses]);
+
+  const addClass = async (d) => {
+    const created = await classesApi.createClass({
+      name: d.name,
+      gradeLevel: d.grade,
+      section: d.section,
+      classTeacherStaffId: d.classTeacherId || null,
+    });
+    setClasses(p => [...p, created]);
+  };
+  const updateClass = async (id, d) => {
+    const current = classes.find(c => c.id === id);
+    const updated = await classesApi.updateClass(id, {
+      name: d.name ?? current?.name,
+      gradeLevel: d.grade ?? current?.gradeLevel,
+      section: d.section ?? current?.section,
+      classTeacherStaffId: (d.classTeacherId ?? current?.classTeacherStaffId) || null,
+      active: d.active ?? current?.active ?? true,
+    });
+    setClasses(p => p.map(c => c.id === id ? updated : c));
+  };
+  const deleteClass = async (id) => {
+    const current = classes.find(c => c.id === id);
+    if (!current) return;
+    const updated = await classesApi.updateClass(id, {
+      name: current.name,
+      gradeLevel: current.gradeLevel,
+      section: current.section,
+      classTeacherStaffId: current.classTeacherStaffId,
+      active: false,
+    });
+    setClasses(p => p.map(c => c.id === id ? updated : c));
+  };
 
   // ── Exams ─────────────────────────────────────────────────────────────────────
-  const addExam    = (d) => setExams(p => [...p, { ...d, id: nextId(p) }]);
-  const updateExam = (id, d) => setExams(p => p.map(e => e.id === id ? { ...e, ...d } : e));
-  const deleteExam = (id) => setExams(p => p.filter(e => e.id !== id));
+  const loadExams = useCallback(async () => {
+    if (!currentUser || !EXAMS_VISIBLE_ROLES.includes(currentUser.role)) {
+      setExams([]);
+      return;
+    }
+    try {
+      setExams(await academicsApi.listExams());
+    } catch {
+      setExams([]);
+    }
+  }, [currentUser]);
+
+  useEffect(() => { loadExams(); }, [loadExams]);
+
+  const addExam = async (d) => {
+    const created = await academicsApi.createExam(d);
+    setExams(p => [...p, created]);
+  };
 
   // ── Announcements ─────────────────────────────────────────────────────────────
-  const addAnnouncement    = (d) => setAnnouncements(p => [...p, { ...d, id: nextId(p) }]);
-  const updateAnnouncement = (id, d) => setAnnouncements(p => p.map(a => a.id === id ? { ...a, ...d } : a));
-  const deleteAnnouncement = (id) => setAnnouncements(p => p.filter(a => a.id !== id));
+  const loadAnnouncements = useCallback(async () => {
+    if (!currentUser) {
+      setAnnouncements([]);
+      return;
+    }
+    try {
+      setAnnouncements(await communicationApi.listNotices());
+    } catch {
+      setAnnouncements([]);
+    }
+  }, [currentUser]);
+
+  useEffect(() => { loadAnnouncements(); }, [loadAnnouncements]);
+
+  const addAnnouncement = async (d) => {
+    const created = await communicationApi.createNotice(d);
+    setAnnouncements(p => [created, ...p]);
+    return created;
+  };
+  const updateAnnouncement = async (id, d) => {
+    const updated = await communicationApi.updateNotice(id, d);
+    setAnnouncements(p => p.map(a => a.id === id ? updated : a));
+    return updated;
+  };
+  const deleteAnnouncement = async (id) => {
+    await communicationApi.deleteNotice(id);
+    setAnnouncements(p => p.filter(a => a.id !== id));
+  };
 
   // ── Holidays ──────────────────────────────────────────────────────────────────
   const addHoliday    = (d) => setHolidays(p => [...p, { ...d, id: nextId(p) }]);
   const deleteHoliday = (id) => setHolidays(p => p.filter(h => h.id !== id));
 
-  // ── Fees (composite key: studentId + term) ────────────────────────────────────
-  const addFeeRecord = (d) => setFees(p => [...p, d]);
-  const markFeePaid  = (studentId, term, method) => {
-    const today = new Date().toISOString().slice(0, 10);
-    setFees(p => p.map(f =>
-      f.studentId === studentId && f.term === term
-        ? { ...f, paid: true, paidDate: today, method }
-        : f
-    ));
+  // ── Fees ──────────────────────────────────────────────────────────────────────
+  const loadFees = useCallback(async () => {
+    if (!currentUser || !FEES_VISIBLE_ROLES.includes(currentUser.role)) {
+      setFees([]);
+      return;
+    }
+    try {
+      setFees(await feeApi.listFeeRecords());
+    } catch {
+      setFees([]);
+    }
+  }, [currentUser]);
+
+  useEffect(() => { loadFees(); }, [loadFees]);
+
+  const payFee = async (d) => {
+    const created = await feeApi.payFee(d);
+    await loadFees();
+    return created;
   };
-  const deleteFeeRecord = (studentId, term) =>
-    setFees(p => p.filter(f => !(f.studentId === studentId && f.term === term)));
+  const updateFeeRecord = async (id, d) => {
+    const updated = await feeApi.updateFeeRecord(id, d);
+    setFees(p => p.map(f => f.id === id ? updated : f));
+    return updated;
+  };
 
   // ── Homework ──────────────────────────────────────────────────────────────────
-  const addHomework    = (d) => setHomework(p => [...p, { ...d, id: nextId(p) }]);
-  const deleteHomework = (id) => setHomework(p => p.filter(h => h.id !== id));
+  const loadHomework = useCallback(async () => {
+    if (!currentUser || !HOMEWORK_VISIBLE_ROLES.includes(currentUser.role)) {
+      setHomework([]);
+      return;
+    }
+    try {
+      setHomework(await academicsApi.listHomework());
+    } catch {
+      setHomework([]);
+    }
+  }, [currentUser]);
 
-  // ── Notes ─────────────────────────────────────────────────────────────────────
-  const addNote    = (d) => setNotes(p => [...p, { ...d, id: nextId(p) }]);
-  const deleteNote = (id) => setNotes(p => p.filter(n => n.id !== id));
+  useEffect(() => { loadHomework(); }, [loadHomework]);
 
-  // ── Attendance (upsert by studentId+date) ─────────────────────────────────────
-  const saveAttendance = (records) => {
-    setAttendance(prev => {
-      const key = (r) => `${r.studentId}-${r.date}`;
-      const newKeys = new Set(records.map(key));
-      return [...prev.filter(r => !newKeys.has(key(r))), ...records];
-    });
+  const addHomework = async (d) => {
+    const created = await academicsApi.createHomework(d);
+    setHomework(p => [...p, created]);
   };
 
-  // ── Timetable ─────────────────────────────────────────────────────────────────
-  const updateTimetableDay = (className, day, periods) =>
-    setTimetable(prev => ({
-      ...prev,
-      [className]: { ...(prev[className] || {}), [day]: periods },
-    }));
+  // ── Notes ─────────────────────────────────────────────────────────────────────
+  const loadNotes = useCallback(async () => {
+    if (!currentUser || !NOTES_VISIBLE_ROLES.includes(currentUser.role)) {
+      setNotes([]);
+      return;
+    }
+    try {
+      setNotes(await academicsApi.listNotes());
+    } catch {
+      setNotes([]);
+    }
+  }, [currentUser]);
+
+  useEffect(() => { loadNotes(); }, [loadNotes]);
+
+  const addNote = async (d) => {
+    const created = await academicsApi.createNote(d);
+    setNotes(p => [...p, created]);
+  };
+
+  // ── Results ───────────────────────────────────────────────────────────────────
+  const loadResults = useCallback(async () => {
+    if (!currentUser || !RESULTS_VISIBLE_ROLES.includes(currentUser.role)) {
+      setResults([]);
+      return;
+    }
+    try {
+      setResults(await academicsApi.listResults());
+    } catch {
+      setResults([]);
+    }
+  }, [currentUser]);
+
+  useEffect(() => { loadResults(); }, [loadResults]);
+
+  const addResult = async (d) => {
+    const created = await academicsApi.createResult(d);
+    setResults(p => [...p, created]);
+    return created;
+  };
 
   return (
     <DataContext.Provider value={{
       classes, exams, announcements, holidays, fees,
-      homework, notes, attendance, staffAttendance, timetable,
+      homework, notes, results,
       addClass, updateClass, deleteClass,
-      addExam, updateExam, deleteExam,
+      addExam,
       addAnnouncement, updateAnnouncement, deleteAnnouncement,
       addHoliday, deleteHoliday,
-      addFeeRecord, markFeePaid, deleteFeeRecord,
-      addHomework, deleteHomework,
-      addNote, deleteNote,
-      saveAttendance,
-      updateTimetableDay,
+      payFee, updateFeeRecord,
+      addHomework,
+      addNote,
+      addResult,
     }}>
       {children}
     </DataContext.Provider>

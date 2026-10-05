@@ -1,199 +1,231 @@
-import { useState } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
+import * as attendanceApi from '../../api/attendanceApi';
 
-export default function AttendanceManagement() {
-  const { attendance, saveAttendance, classes } = useData();
-  const { currentUser, allUsers } = useAuth();
-  const students  = allUsers.filter(u => u.role === 'student');
-  const isTeacher = currentUser?.role === 'teacher';
+const STATUSES = ['PRESENT', 'ABSENT', 'LATE', 'EXCUSED'];
 
-  const myClasses = isTeacher
-    ? (currentUser.classesHandled || [])
-    : classes.map(c => c.name);
+function today() {
+  return new Date().toISOString().slice(0, 10);
+}
 
-  const today = new Date().toISOString().slice(0, 10);
+/* ── Teacher: mark attendance ──────────────────────────────────────────── */
+function MarkAttendance() {
+  const { classes } = useData();
+  const { currentUser, allStudents } = useAuth();
+  const myClasses = classes.filter(c => c.classTeacherStaffId === currentUser.staffId && c.active !== false);
 
-  const [selectedClass, setSelectedClass] = useState(myClasses[0] || '');
-  const [date,          setDate]          = useState(today);
-  const [attState,      setAttState]      = useState(() => buildInit(myClasses[0] || '', today));
-  const [saved,         setSaved]         = useState(false);
+  const [selectedClass, setSelectedClass] = useState(myClasses[0]?.id ?? '');
+  const [date,           setDate]          = useState(today());
+  const [attState,       setAttState]      = useState({});
+  const [loading,        setLoading]       = useState(false);
+  const [loadError,      setLoadError]     = useState('');
+  const [saving,         setSaving]        = useState(false);
+  const [saveError,      setSaveError]     = useState('');
+  const [saved,          setSaved]         = useState(false);
 
-  function buildInit(cls, dt) {
-    const init = {};
-    students.filter(u => u.class === cls).forEach(s => {
-      const existing = attendance.find(a => a.studentId === s.id && a.date === dt);
-      init[s.id] = existing?.status || 'Present';
-    });
-    return init;
-  }
+  const classStudents = allStudents.filter(s => s.classId === Number(selectedClass));
 
-  const handleClassChange = (cls) => {
-    setSelectedClass(cls);
-    setAttState(buildInit(cls, date));
-    setSaved(false);
-  };
+  const loadExisting = useCallback(async () => {
+    if (!selectedClass || !date) return;
+    setLoading(true);
+    setLoadError('');
+    try {
+      const res = await attendanceApi.getClassAttendance(selectedClass, date);
+      const init = {};
+      (res.records || []).forEach(r => { init[r.studentId] = r.status; });
+      setAttState(init);
+    } catch (err) {
+      setLoadError(err.message || 'Failed to load existing attendance.');
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedClass, date]);
 
-  const handleDateChange = (dt) => {
-    setDate(dt);
-    setAttState(buildInit(selectedClass, dt));
-    setSaved(false);
-  };
+  useEffect(() => { loadExisting(); setSaved(false); }, [loadExisting]);
 
   const toggle = (id, val) => { setAttState(prev => ({ ...prev, [id]: val })); setSaved(false); };
 
   const setAll = (status) => {
     const n = {};
-    students.filter(u => u.class === selectedClass).forEach(s => { n[s.id] = status; });
+    classStudents.forEach(s => { n[s.id] = status; });
     setAttState(n);
     setSaved(false);
   };
 
-  const save = () => {
+  const save = async () => {
     if (!selectedClass || !date) return;
-    const classStudents = students.filter(u => u.class === selectedClass);
-    const records = classStudents.map(s => ({
-      studentId: s.id,
-      class: selectedClass,
-      date,
-      status: attState[s.id] || 'Present',
-    }));
-    saveAttendance(records);
-    setSaved(true);
+    setSaving(true);
+    setSaveError('');
+    try {
+      const entries = classStudents.map(s => ({ studentId: s.id, status: attState[s.id] || 'PRESENT' }));
+      await attendanceApi.markAttendance(Number(selectedClass), date, entries);
+      setSaved(true);
+    } catch (err) {
+      setSaveError(err.message || 'Failed to save attendance.');
+    } finally {
+      setSaving(false);
+    }
   };
-
-  // ── Principal / Headmaster: attendance overview ───────────────────────────
-  if (!isTeacher) {
-    const studentAtt = {};
-    students.forEach(s => {
-      const recs    = attendance.filter(a => a.studentId === s.id);
-      const present = recs.filter(a => a.status === 'Present').length;
-      const absent  = recs.filter(a => a.status === 'Absent').length;
-      const late    = recs.filter(a => a.status === 'Late').length;
-      const total   = recs.length;
-      studentAtt[s.id] = { present, absent, late, total, pct: total ? Math.round((present + late * 0.5) / total * 100) : 0 };
-    });
-    const avgPct  = students.length ? Math.round(Object.values(studentAtt).reduce((s, a) => s + a.pct, 0) / students.length) : 0;
-    const below75 = Object.values(studentAtt).filter(a => a.pct < 75).length;
-
-    return (
-      <div>
-        <div className="page-header">
-          <div className="page-header-left">
-            <h1>Attendance Overview</h1>
-            <p>Student attendance records for all classes</p>
-          </div>
-        </div>
-
-        <div className="stat-grid mb-20">
-          <div className="stat-card"><div className="stat-icon bg-green">✅</div><div className="stat-info"><div className="stat-value">{avgPct}%</div><div className="stat-label">Avg Attendance</div></div></div>
-          <div className="stat-card"><div className="stat-icon bg-orange">⚠</div><div className="stat-info"><div className="stat-value">{below75}</div><div className="stat-label">Below 75%</div></div></div>
-          <div className="stat-card"><div className="stat-icon bg-blue">📋</div><div className="stat-info"><div className="stat-value">{attendance.length}</div><div className="stat-label">Total Records</div></div></div>
-        </div>
-
-        <div className="card">
-          <div className="card-header"><div className="card-title">Student Attendance Summary</div></div>
-          <div className="table-wrapper">
-            <table>
-              <thead>
-                <tr><th>Student</th><th>Class</th><th>Present</th><th>Absent</th><th>Late</th><th>Total Days</th><th>Attendance %</th></tr>
-              </thead>
-              <tbody>
-                {students.map(s => {
-                  const a   = studentAtt[s.id] || {};
-                  const low = (a.pct || 0) < 75;
-                  return (
-                    <tr key={s.id}>
-                      <td><div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span className="avatar avatar-sm role-student">{s.avatar}</span>{s.name}</div></td>
-                      <td>{s.class}</td>
-                      <td style={{ color: 'var(--success)', fontWeight: 600 }}>{a.present || 0}</td>
-                      <td style={{ color: 'var(--danger)',  fontWeight: 600 }}>{a.absent  || 0}</td>
-                      <td style={{ color: 'var(--warning)', fontWeight: 600 }}>{a.late    || 0}</td>
-                      <td>{a.total || 0}</td>
-                      <td>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <div style={{ flex: 1, height: 6, background: 'var(--border)', borderRadius: 3, overflow: 'hidden' }}>
-                            <div style={{ height: '100%', width: `${a.pct || 0}%`, background: low ? 'var(--danger)' : 'var(--success)', borderRadius: 3 }} />
-                          </div>
-                          <span style={{ fontSize: 12, fontWeight: 600, color: low ? 'var(--danger)' : 'var(--success)', minWidth: 38 }}>{a.pct || 0}%</span>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // ── Teacher: mark attendance ──────────────────────────────────────────────
-  const classStudents = students.filter(u => u.class === selectedClass);
 
   return (
     <div>
       <div className="page-header">
         <div className="page-header-left"><h1>Mark Attendance</h1></div>
         <div className="page-header-actions">
-          <select className="form-control" style={{ width: 120 }}
-            value={selectedClass} onChange={e => handleClassChange(e.target.value)}>
-            {myClasses.map(c => <option key={c} value={c}>Class {c}</option>)}
+          <select className="form-control" style={{ width: 140 }}
+            value={selectedClass} onChange={e => setSelectedClass(e.target.value)}>
+            {myClasses.map(c => <option key={c.id} value={c.id}>Class {c.name}</option>)}
           </select>
           <input type="date" className="form-control" style={{ width: 160 }}
-            value={date} onChange={e => handleDateChange(e.target.value)} />
+            value={date} onChange={e => setDate(e.target.value)} />
           <button
             className={`btn btn-${saved ? 'success' : 'primary'}`}
             onClick={save}
+            disabled={saving || !selectedClass}
           >
-            {saved ? '✓ Saved' : 'Save Attendance'}
+            {saving ? 'Saving…' : saved ? '✓ Saved' : 'Save Attendance'}
           </button>
         </div>
       </div>
 
-      <div className="card">
-        <div className="card-header">
-          <div className="card-title">Class {selectedClass} — {date}</div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button className="btn btn-success btn-sm" onClick={() => setAll('Present')}>All Present</button>
-            <button className="btn btn-danger btn-sm"  onClick={() => setAll('Absent')}>All Absent</button>
+      {saveError && <div className="alert alert-danger mb-20">{saveError}</div>}
+
+      {myClasses.length === 0 ? (
+        <div className="card"><div className="card-body" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>You are not assigned as class teacher for any class.</div></div>
+      ) : (
+        <div className="card">
+          <div className="card-header">
+            <div className="card-title">Class {myClasses.find(c => c.id === Number(selectedClass))?.name} — {date}</div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="btn btn-success btn-sm" onClick={() => setAll('PRESENT')}>All Present</button>
+              <button className="btn btn-danger btn-sm"  onClick={() => setAll('ABSENT')}>All Absent</button>
+            </div>
+          </div>
+          {loadError && <div className="alert alert-danger" style={{ margin: 16 }}>{loadError}</div>}
+          <div className="table-wrapper">
+            <table>
+              <thead><tr><th>Student Name</th><th>Admission No</th>{STATUSES.map(s => <th key={s}>{s}</th>)}</tr></thead>
+              <tbody>
+                {loading ? (
+                  <tr><td colSpan={2 + STATUSES.length} style={{ textAlign: 'center', padding: 24 }}>Loading…</td></tr>
+                ) : classStudents.length === 0 ? (
+                  <tr><td colSpan={2 + STATUSES.length} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 24 }}>No students found for this class.</td></tr>
+                ) : classStudents.map(s => (
+                  <tr key={s.id}>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span className="avatar avatar-sm role-student">{s.avatar}</span>
+                        {s.name}
+                      </div>
+                    </td>
+                    <td>{s.admissionNumber}</td>
+                    {STATUSES.map(status => (
+                      <td key={status}>
+                        <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                          <input
+                            type="radio"
+                            name={`att-${s.id}`}
+                            checked={(attState[s.id] || 'PRESENT') === status}
+                            onChange={() => toggle(s.id, status)}
+                          />
+                        </label>
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Principal / Headmaster: today's overview ──────────────────────────── */
+function AttendanceOverview() {
+  const { classes } = useData();
+  const activeClasses = classes.filter(c => c.active !== false);
+
+  const [summary,     setSummary]     = useState(null);
+  const [classRows,   setClassRows]   = useState([]);
+  const [loading,     setLoading]     = useState(false);
+  const [loadError,   setLoadError]   = useState('');
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setLoadError('');
+    try {
+      const [summaryRes, classResults] = await Promise.all([
+        attendanceApi.getSchoolSummary(),
+        Promise.all(activeClasses.map(c =>
+          attendanceApi.getClassAttendance(c.id).then(res => ({ cls: c, res }))
+        )),
+      ]);
+      setSummary(summaryRes);
+      setClassRows(classResults.map(({ cls, res }) => {
+        const records = res.records || [];
+        const counts = { PRESENT: 0, ABSENT: 0, LATE: 0, EXCUSED: 0 };
+        records.forEach(r => { if (counts[r.status] !== undefined) counts[r.status]++; });
+        return { cls, total: records.length, ...counts };
+      }));
+    } catch (err) {
+      setLoadError(err.message || 'Failed to load attendance overview.');
+    } finally {
+      setLoading(false);
+    }
+  }, [classes]);
+
+  useEffect(() => { load(); }, [load]);
+
+  return (
+    <div>
+      <div className="page-header">
+        <div className="page-header-left">
+          <h1>Attendance Overview</h1>
+          <p>Today's attendance across all classes</p>
+        </div>
+      </div>
+
+      {loadError && <div className="alert alert-danger mb-20">{loadError}</div>}
+
+      <div className="stat-grid mb-20">
+        <div className="stat-card"><div className="stat-icon bg-blue">📋</div><div className="stat-info"><div className="stat-value">{summary?.totalRecordsToday ?? '—'}</div><div className="stat-label">Marked Today</div></div></div>
+        <div className="stat-card"><div className="stat-icon bg-green">✅</div><div className="stat-info"><div className="stat-value">{summary?.presentToday ?? '—'}</div><div className="stat-label">Present Today</div></div></div>
+        <div className="stat-card"><div className="stat-icon bg-orange">⚠</div><div className="stat-info"><div className="stat-value">{summary?.absentToday ?? '—'}</div><div className="stat-label">Absent Today</div></div></div>
+      </div>
+
+      <div className="card">
+        <div className="card-header"><div className="card-title">Per-Class Breakdown — {today()}</div></div>
         <div className="table-wrapper">
           <table>
-            <thead><tr><th>Roll No</th><th>Student Name</th><th>Present</th><th>Absent</th><th>Late</th></tr></thead>
+            <thead><tr><th>Class</th><th>Marked</th>{STATUSES.map(s => <th key={s}>{s}</th>)}</tr></thead>
             <tbody>
-              {classStudents.map(s => (
-                <tr key={s.id}>
-                  <td>{s.rollNo}</td>
-                  <td>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span className="avatar avatar-sm role-student">{s.avatar}</span>
-                      {s.name}
-                    </div>
-                  </td>
-                  {['Present', 'Absent', 'Late'].map(status => (
-                    <td key={status}>
-                      <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-                        <input
-                          type="radio"
-                          name={`att-${s.id}`}
-                          checked={(attState[s.id] || 'Present') === status}
-                          onChange={() => toggle(s.id, status)}
-                        />
-                      </label>
-                    </td>
-                  ))}
+              {loading ? (
+                <tr><td colSpan={2 + STATUSES.length} style={{ textAlign: 'center', padding: 24 }}>Loading…</td></tr>
+              ) : classRows.length === 0 ? (
+                <tr><td colSpan={2 + STATUSES.length} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 24 }}>No classes found.</td></tr>
+              ) : classRows.map(({ cls, total, PRESENT, ABSENT, LATE, EXCUSED }) => (
+                <tr key={cls.id}>
+                  <td><span className="badge badge-info">Class {cls.name}</span></td>
+                  <td>{total}</td>
+                  <td style={{ color: 'var(--success)', fontWeight: 600 }}>{PRESENT}</td>
+                  <td style={{ color: 'var(--danger)',  fontWeight: 600 }}>{ABSENT}</td>
+                  <td style={{ color: 'var(--warning)', fontWeight: 600 }}>{LATE}</td>
+                  <td>{EXCUSED}</td>
                 </tr>
               ))}
-              {classStudents.length === 0 && (
-                <tr><td colSpan={5} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 24 }}>No students found for Class {selectedClass}.</td></tr>
-              )}
             </tbody>
           </table>
         </div>
       </div>
     </div>
   );
+}
+
+export default function AttendanceManagement() {
+  const { currentUser } = useAuth();
+  const isTeacher = currentUser?.role === 'teacher';
+  return isTeacher ? <MarkAttendance /> : <AttendanceOverview />;
 }

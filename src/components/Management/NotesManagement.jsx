@@ -2,41 +2,49 @@ import { useState } from 'react';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 
+const SUBJECTS = ['Mathematics', 'Science', 'English', 'History', 'Geography', 'Computer', 'PE', 'Drawing'];
+
+const BLANK = { classId: '', subject: '', title: '', fileUrl: '' };
+
 export default function NotesManagement() {
-  const { notes, addNote, deleteNote, classes } = useData();
+  const { notes, addNote, classes } = useData();
   const { currentUser } = useAuth();
-  const isTeacher   = currentUser?.role === 'teacher';
+  const isTeacher = currentUser?.role === 'teacher';
 
-  const myClasses   = isTeacher ? (currentUser.classesHandled || []) : classes.map(c => c.name);
-  const initSubject = isTeacher ? (currentUser.subject || '') : '';
-  const blankForm   = { title: '', class: myClasses[0] || '', subject: initSubject, fileType: 'PDF', pages: '' };
-
-  const [showForm,      setShowForm]      = useState(false);
-  const [form,          setForm]          = useState(blankForm);
-  const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [showForm,     setShowForm]     = useState(false);
+  const [form,         setForm]         = useState(BLANK);
+  const [submitting,   setSubmitting]   = useState(false);
+  const [submitError,  setSubmitError]  = useState('');
 
   const set   = (k, v) => setForm(f => ({ ...f, [k]: v }));
-  const reset = () => { setForm(blankForm); setShowForm(false); };
+  const reset = () => { setForm(BLANK); setShowForm(false); setSubmitError(''); };
 
-  const today = new Date().toISOString().slice(0, 10);
+  const classNameFor = (classId) => {
+    const cls = classes.find(c => String(c.id) === String(classId));
+    return cls ? `${cls.gradeLevel}${cls.section}` : classId;
+  };
 
-  const submit = () => {
-    if (!form.title.trim() || !form.class) return;
-    addNote({
-      subject:    form.subject || initSubject,
-      title:      form.title,
-      uploadedBy: currentUser?.name || '',
-      class:      form.class,
-      date:       today,
-      fileType:   form.fileType,
-      pages:      Number(form.pages) || 0,
-      downloads:  0,
-    });
-    reset();
+  const submit = async () => {
+    if (!form.title.trim() || !form.classId || !form.subject) return;
+    setSubmitting(true);
+    setSubmitError('');
+    try {
+      await addNote({
+        classId: Number(form.classId),
+        subject: form.subject,
+        title:   form.title,
+        fileUrl: form.fileUrl,
+      });
+      reset();
+    } catch (err) {
+      setSubmitError(err.message || 'Failed to upload material');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const displayNotes = isTeacher
-    ? notes.filter(n => n.uploadedBy === currentUser?.name)
+    ? notes.filter(n => n.uploadedByStaffId === currentUser?.staffId)
     : notes;
 
   return (
@@ -60,6 +68,7 @@ export default function NotesManagement() {
             <button className="btn btn-ghost btn-sm" onClick={reset}>Cancel</button>
           </div>
           <div className="card-body">
+            {submitError && <div className="alert alert-danger mb-12">{submitError}</div>}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
               <div className="form-group">
                 <label className="form-label">Title *</label>
@@ -67,29 +76,25 @@ export default function NotesManagement() {
               </div>
               <div className="form-group">
                 <label className="form-label">Class *</label>
-                <select className="form-control" value={form.class} onChange={e => set('class', e.target.value)}>
-                  {myClasses.map(c => <option key={c} value={c}>{c}</option>)}
+                <select className="form-control" value={form.classId} onChange={e => set('classId', e.target.value)}>
+                  <option value="">Select class…</option>
+                  {classes.map(c => <option key={c.id} value={c.id}>Class {c.gradeLevel}{c.section}</option>)}
                 </select>
               </div>
               <div className="form-group">
-                <label className="form-label">Subject</label>
-                <input className="form-control" value={form.subject} readOnly style={{ background: 'var(--bg-app)' }} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">File Type</label>
-                <select className="form-control" value={form.fileType} onChange={e => set('fileType', e.target.value)}>
-                  <option value="PDF">PDF</option>
-                  <option value="DOCX">DOCX</option>
-                  <option value="PPT">PPT</option>
+                <label className="form-label">Subject *</label>
+                <select className="form-control" value={form.subject} onChange={e => set('subject', e.target.value)}>
+                  <option value="">Select…</option>
+                  {SUBJECTS.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
               <div className="form-group">
-                <label className="form-label">Pages (optional)</label>
-                <input type="number" className="form-control" value={form.pages} onChange={e => set('pages', e.target.value)} placeholder="e.g. 12" />
+                <label className="form-label">File URL</label>
+                <input className="form-control" value={form.fileUrl} onChange={e => set('fileUrl', e.target.value)} placeholder="https://…" />
               </div>
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button className="btn btn-primary" onClick={submit}>Add Material</button>
+              <button className="btn btn-primary" onClick={submit} disabled={submitting}>{submitting ? 'Uploading…' : 'Add Material'}</button>
               <button className="btn btn-outline" onClick={reset}>Cancel</button>
             </div>
           </div>
@@ -101,9 +106,7 @@ export default function NotesManagement() {
           <table>
             <thead>
               <tr>
-                <th>Subject</th><th>Title</th><th>Class</th><th>Uploaded By</th>
-                <th>Date</th><th>Type</th><th>Pages</th><th>Downloads</th>
-                {isTeacher && <th>Actions</th>}
+                <th>Subject</th><th>Title</th><th>Class</th><th>File</th>
               </tr>
             </thead>
             <tbody>
@@ -111,28 +114,14 @@ export default function NotesManagement() {
                 <tr key={n.id}>
                   <td>{n.subject}</td>
                   <td style={{ fontWeight: 500 }}>{n.title}</td>
-                  <td><span className="badge badge-info">{n.class}</span></td>
-                  <td style={{ fontSize: 12 }}>{n.uploadedBy}</td>
-                  <td style={{ fontSize: 12 }}>{n.date}</td>
-                  <td><span className="badge badge-gray">{n.fileType}</span></td>
-                  <td>{n.pages || '—'}</td>
-                  <td>{n.downloads}</td>
-                  {isTeacher && (
-                    <td>
-                      {deleteConfirm === n.id ? (
-                        <div style={{ display: 'flex', gap: 4 }}>
-                          <button className="btn btn-danger btn-sm" onClick={() => { deleteNote(n.id); setDeleteConfirm(null); }}>Yes</button>
-                          <button className="btn btn-ghost btn-sm" onClick={() => setDeleteConfirm(null)}>No</button>
-                        </div>
-                      ) : (
-                        <button className="btn btn-danger btn-sm" onClick={() => setDeleteConfirm(n.id)}>Delete</button>
-                      )}
-                    </td>
-                  )}
+                  <td><span className="badge badge-info">{classNameFor(n.classId)}</span></td>
+                  <td>
+                    {n.fileUrl ? <a href={n.fileUrl} target="_blank" rel="noreferrer">Open</a> : '—'}
+                  </td>
                 </tr>
               ))}
               {displayNotes.length === 0 && (
-                <tr><td colSpan={isTeacher ? 9 : 8} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 24 }}>No materials found.</td></tr>
+                <tr><td colSpan={4} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 24 }}>No materials found.</td></tr>
               )}
             </tbody>
           </table>

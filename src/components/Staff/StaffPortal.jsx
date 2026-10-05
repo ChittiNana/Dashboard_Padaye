@@ -6,7 +6,7 @@ import FeeManagement from '../Management/FeeManagement';
 function Dashboard({ user }) {
   const { announcements } = useData();
   const roleLabel = user.role === 'support_staff'
-    ? (user.subRole || 'Support Staff')
+    ? 'Support Staff'
     : user.role.charAt(0).toUpperCase() + user.role.slice(1);
 
   return (
@@ -14,7 +14,7 @@ function Dashboard({ user }) {
       <div className="page-header">
         <div className="page-header-left">
           <h1>Welcome, {user.name} 👋</h1>
-          <p>Role: {roleLabel}{user.shift ? ` · Shift: ${user.shift}` : ''}</p>
+          <p>Role: {roleLabel}</p>
         </div>
         <span className="badge badge-info">{schoolInfo.name}</span>
       </div>
@@ -41,12 +41,12 @@ function Dashboard({ user }) {
             <div className="stat-label">Classes</div>
           </div>
         </div>
-        {user.employeeId && (
+        {user.staffCode && (
           <div className="stat-card">
             <div className="stat-icon bg-orange">🪪</div>
             <div className="stat-info">
-              <div className="stat-value">{user.employeeId}</div>
-              <div className="stat-label">Employee ID</div>
+              <div className="stat-value">{user.staffCode}</div>
+              <div className="stat-label">Staff Code</div>
             </div>
           </div>
         )}
@@ -67,14 +67,9 @@ function Dashboard({ user }) {
               </div>
             </div>
             {[
-              ['Email',        user.email],
-              ['Phone',        user.phone],
-              ['Gender',       user.gender],
-              ['Employee ID',  user.employeeId],
-              ['Qualification',user.qualification],
-              ['Join Date',    user.joinDate],
-              ['Shift',        user.shift],
-              ['Address',      user.address],
+              ['Email',      user.email],
+              ['Phone',      user.phone],
+              ['Staff Code', user.staffCode],
             ].filter(([,v]) => v).map(([k, v]) => (
               <div key={k} style={{ display: 'flex', gap: 12, paddingBottom: 10, marginBottom: 10, borderBottom: '1px solid var(--border)', fontSize: 13 }}>
                 <span style={{ color: 'var(--text-muted)', minWidth: 110 }}>{k}</span>
@@ -93,9 +88,8 @@ function Dashboard({ user }) {
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 2 }}>
                   <span style={{ fontSize: 14 }}>📢</span>
                   <span style={{ fontWeight: 600, fontSize: 13 }}>{a.title}</span>
-                  <span className={`badge badge-${a.priority === 'high' ? 'danger' : 'warning'}`}>{a.priority}</span>
                 </div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{a.date} · {a.postedBy}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{a.createdAt ? new Date(a.createdAt).toLocaleDateString() : '—'}</div>
               </div>
             ))}
           </div>
@@ -120,10 +114,9 @@ function NoticesView() {
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 6 }}>
                     <span style={{ fontSize: 16 }}>📢</span>
                     <span style={{ fontWeight: 600, fontSize: 14 }}>{a.title}</span>
-                    <span className={`badge badge-${a.priority === 'high' ? 'danger' : a.priority === 'medium' ? 'warning' : 'info'}`}>{a.priority}</span>
                   </div>
                   <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 8 }}>{a.body}</p>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Posted by {a.postedBy} · {a.date}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{a.createdAt ? new Date(a.createdAt).toLocaleDateString() : '—'}</div>
                 </div>
               </div>
             </div>
