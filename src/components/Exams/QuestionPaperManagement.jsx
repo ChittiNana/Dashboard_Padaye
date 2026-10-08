@@ -4,6 +4,8 @@ import { useData } from '../../context/DataContext';
 import * as academicsApi from '../../api/academicsApi';
 import * as peopleApi from '../../api/peopleApi';
 import { schoolInfo } from '../../data/mockData';
+import { readWithFallback, writeThroughMock } from '../../api/mockFallback';
+import { listTable, insertRecord } from '../../data/mockStore';
 
 const SUBJECTS = ['Mathematics', 'Science', 'English', 'Hindi', 'History', 'Geography', 'Computer', 'PE', 'Drawing'];
 
@@ -588,7 +590,6 @@ function PaperEditor({ paperType: paperTypeProp, onSave, onBack, classes, exams 
   // Re-rolls the Column B scramble for a Match-the-Following (Shuffled) question.
   const reshufflePairs = (sid, qid) => {
     const sec = form.sections.find(s => s.id === sid);
-    const q   = sec.questions.find(qq => qq.id === qid);
     updateSection(sid, 'questions', sec.questions.map(qq =>
       qq.id === qid ? { ...qq, shuffledOrder: shuffleDerangement(qq.pairs.length) } : qq
     ));
@@ -1131,24 +1132,35 @@ export default function QuestionPaperManagement({ defaultView = 'list' }) {
   const canManage = ['principal', 'headmaster', 'teacher'].includes(currentUser?.role);
 
   const loadPapers = useCallback(async () => {
-    try {
-      setPapers(await academicsApi.listQuestionPapers());
-      setPapersError('');
-    } catch (err) {
-      setPapersError(err.message || 'Failed to load question papers');
-    }
+    setPapers(await readWithFallback(
+      () => academicsApi.listQuestionPapers(),
+      () => listTable('questionPapers'),
+      { label: 'listQuestionPapers' },
+    ));
+    setPapersError('');
   }, []);
 
   useEffect(() => { loadPapers(); }, [loadPapers]);
 
   useEffect(() => {
     if (!canManage) { setStudents([]); return; }
-    peopleApi.listStudents().then(setStudents).catch(() => setStudents([]));
+    readWithFallback(
+      () => peopleApi.listStudents(),
+      () => listTable('students'),
+      { label: 'listStudents' },
+    ).then(setStudents);
   }, [canManage]);
 
-  const handleSavePaper = async (paperData) => {
-    const created = await academicsApi.createQuestionPaper(paperData);
-    setPapers(prev => [...prev, created]);
+  const handleSavePaper = (paperData) => {
+    writeThroughMock(
+      () => {
+        const created = insertRecord('questionPapers', paperData);
+        setPapers(prev => [...prev, created]);
+        return created;
+      },
+      () => academicsApi.createQuestionPaper(paperData),
+      { label: 'createQuestionPaper' },
+    );
     setView('list');
     setNewPaperType(null);
   };

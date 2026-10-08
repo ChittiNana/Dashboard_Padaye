@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import * as usersApi from '../../api/usersApi';
+import { readWithFallback } from '../../api/mockFallback';
+import { listTable, toUsersApiShape } from '../../data/mockStore';
 
 const ROLES = [
   { value: 'PRINCIPAL',     label: 'Principal',      icon: '🎓' },
@@ -116,7 +118,6 @@ export default function Registration() {
   const [form, setForm] = useState({ ...EMPTY_FORM });
   const [errors, setErrors] = useState({});
   const [successMsg, setSuccessMsg] = useState('');
-  const [submitError, setSubmitError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [search, setSearch] = useState('');
   const [filterRole, setFilterRole] = useState('all');
@@ -124,7 +125,6 @@ export default function Registration() {
 
   const [users, setUsers] = useState([]);
   const [listLoading, setListLoading] = useState(true);
-  const [listError, setListError] = useState('');
 
   const canRegister = ['principal', 'headmaster', 'it_manager'].includes(currentUser?.role);
   const isItManager = currentUser?.role === 'it_manager';
@@ -132,10 +132,12 @@ export default function Registration() {
 
   const loadUsers = useCallback(() => {
     setListLoading(true);
-    setListError('');
-    usersApi.listUsers()
+    readWithFallback(
+      () => usersApi.listUsers(),
+      () => listTable('users').map(toUsersApiShape),
+      { label: 'listUsers' },
+    )
       .then(setUsers)
-      .catch(err => setListError(err.message || 'Failed to load users.'))
       .finally(() => setListLoading(false));
   }, []);
 
@@ -159,33 +161,27 @@ export default function Registration() {
     return Object.keys(e).length === 0;
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
-    setSubmitError('');
     if (!validate()) return;
 
     setSubmitting(true);
-    try {
-      await registerUser({
-        username: form.username.trim(),
-        email: form.email.trim(),
-        password: form.password,
-        fullName: form.fullName.trim(),
-        role: form.role,
-      });
-      setSuccessMsg(`${form.fullName} registered successfully as ${form.role.toLowerCase().replace('_', ' ')}.`);
-      setForm({ ...EMPTY_FORM });
-      setErrors({});
-      loadUsers();
-      setTimeout(() => { setSuccessMsg(''); setView('list'); }, 2000);
-    } catch (err) {
-      setSubmitError(err.message || 'Failed to register user.');
-    } finally {
-      setSubmitting(false);
-    }
+    const created = registerUser({
+      username: form.username.trim(),
+      email: form.email.trim(),
+      password: form.password,
+      fullName: form.fullName.trim(),
+      role: form.role,
+    });
+    setUsers(p => [...p, toUsersApiShape(created)]);
+    setSuccessMsg(`${form.fullName} registered successfully as ${form.role.toLowerCase().replace('_', ' ')}.`);
+    setForm({ ...EMPTY_FORM });
+    setErrors({});
+    setSubmitting(false);
+    setTimeout(() => { setSuccessMsg(''); setView('list'); }, 2000);
   };
 
-  const resetForm = () => { setForm({ ...EMPTY_FORM }); setErrors({}); setSuccessMsg(''); setSubmitError(''); };
+  const resetForm = () => { setForm({ ...EMPTY_FORM }); setErrors({}); setSuccessMsg(''); };
 
   const filtered = users.filter(u => {
     const roleKey = (u.role || '').toLowerCase();
@@ -261,9 +257,7 @@ export default function Registration() {
                   </tr>
                 </thead>
                 <tbody>
-                  {listError ? (
-                    <tr><td colSpan={6} style={{ textAlign: 'center', padding: 32, color: 'var(--danger)' }}>⚠ {listError}</td></tr>
-                  ) : listLoading ? (
+                  {listLoading ? (
                     <tr><td colSpan={6} style={{ textAlign: 'center', padding: 32, color: 'var(--text-muted)' }}>Loading users…</td></tr>
                   ) : filtered.length === 0 ? (
                     <tr><td colSpan={6} style={{ textAlign: 'center', padding: 32, color: 'var(--text-muted)' }}>No users found</td></tr>
@@ -293,10 +287,6 @@ export default function Registration() {
                 <span>✅</span> {successMsg}
               </div>
             )}
-            {submitError && (
-              <div className="login-error mb-20">⚠ {submitError}</div>
-            )}
-
             <form onSubmit={handleSubmit} noValidate>
               <div className="reg-section">
                 <div className="reg-section-title">👤 Select Role *</div>

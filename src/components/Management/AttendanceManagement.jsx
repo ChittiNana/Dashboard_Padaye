@@ -1,7 +1,9 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import * as attendanceApi from '../../api/attendanceApi';
+import { readWithFallback, writeThroughMock } from '../../api/mockFallback';
+import { deriveClassAttendance, deriveSchoolAttendanceSummary, applyMarkAttendance } from '../../data/mockStore';
 
 const STATUSES = ['PRESENT', 'ABSENT', 'LATE', 'EXCUSED'];
 
@@ -30,16 +32,15 @@ function MarkAttendance() {
     if (!selectedClass || !date) return;
     setLoading(true);
     setLoadError('');
-    try {
-      const res = await attendanceApi.getClassAttendance(selectedClass, date);
-      const init = {};
-      (res.records || []).forEach(r => { init[r.studentId] = r.status; });
-      setAttState(init);
-    } catch (err) {
-      setLoadError(err.message || 'Failed to load existing attendance.');
-    } finally {
-      setLoading(false);
-    }
+    const res = await readWithFallback(
+      () => attendanceApi.getClassAttendance(selectedClass, date),
+      () => deriveClassAttendance(selectedClass, date),
+      { label: 'getClassAttendance' },
+    );
+    const init = {};
+    (res.records || []).forEach(r => { init[r.studentId] = r.status; });
+    setAttState(init);
+    setLoading(false);
   }, [selectedClass, date]);
 
   useEffect(() => { loadExisting(); setSaved(false); }, [loadExisting]);
@@ -53,19 +54,18 @@ function MarkAttendance() {
     setSaved(false);
   };
 
-  const save = async () => {
+  const save = () => {
     if (!selectedClass || !date) return;
     setSaving(true);
     setSaveError('');
-    try {
-      const entries = classStudents.map(s => ({ studentId: s.id, status: attState[s.id] || 'PRESENT' }));
-      await attendanceApi.markAttendance(Number(selectedClass), date, entries);
-      setSaved(true);
-    } catch (err) {
-      setSaveError(err.message || 'Failed to save attendance.');
-    } finally {
-      setSaving(false);
-    }
+    const entries = classStudents.map(s => ({ studentId: s.id, status: attState[s.id] || 'PRESENT' }));
+    writeThroughMock(
+      () => applyMarkAttendance(Number(selectedClass), date, entries),
+      () => attendanceApi.markAttendance(Number(selectedClass), date, entries),
+      { label: 'markAttendance' },
+    );
+    setSaved(true);
+    setSaving(false);
   };
 
   return (
@@ -146,7 +146,7 @@ function MarkAttendance() {
 /* ── Principal / Headmaster: today's overview ──────────────────────────── */
 function AttendanceOverview() {
   const { classes } = useData();
-  const activeClasses = classes.filter(c => c.active !== false);
+  const activeClasses = useMemo(() => classes.filter(c => c.active !== false), [classes]);
 
   const [summary,     setSummary]     = useState(null);
   const [classRows,   setClassRows]   = useState([]);
@@ -156,26 +156,29 @@ function AttendanceOverview() {
   const load = useCallback(async () => {
     setLoading(true);
     setLoadError('');
-    try {
-      const [summaryRes, classResults] = await Promise.all([
-        attendanceApi.getSchoolSummary(),
-        Promise.all(activeClasses.map(c =>
-          attendanceApi.getClassAttendance(c.id).then(res => ({ cls: c, res }))
-        )),
-      ]);
-      setSummary(summaryRes);
-      setClassRows(classResults.map(({ cls, res }) => {
-        const records = res.records || [];
-        const counts = { PRESENT: 0, ABSENT: 0, LATE: 0, EXCUSED: 0 };
-        records.forEach(r => { if (counts[r.status] !== undefined) counts[r.status]++; });
-        return { cls, total: records.length, ...counts };
-      }));
-    } catch (err) {
-      setLoadError(err.message || 'Failed to load attendance overview.');
-    } finally {
-      setLoading(false);
-    }
-  }, [classes]);
+    const [summaryRes, classResults] = await Promise.all([
+      readWithFallback(
+        () => attendanceApi.getSchoolSummary(),
+        () => deriveSchoolAttendanceSummary(),
+        { label: 'getSchoolSummary' },
+      ),
+      Promise.all(activeClasses.map(c =>
+        readWithFallback(
+          () => attendanceApi.getClassAttendance(c.id),
+          () => deriveClassAttendance(c.id),
+          { label: 'getClassAttendance' },
+        ).then(res => ({ cls: c, res }))
+      )),
+    ]);
+    setSummary(summaryRes);
+    setClassRows(classResults.map(({ cls, res }) => {
+      const records = res.records || [];
+      const counts = { PRESENT: 0, ABSENT: 0, LATE: 0, EXCUSED: 0 };
+      records.forEach(r => { if (counts[r.status] !== undefined) counts[r.status]++; });
+      return { cls, total: records.length, ...counts };
+    }));
+    setLoading(false);
+  }, [activeClasses]);
 
   useEffect(() => { load(); }, [load]);
 

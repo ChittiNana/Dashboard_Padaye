@@ -4,7 +4,8 @@ import { useData } from '../../context/DataContext';
 import * as attendanceApi from '../../api/attendanceApi';
 import * as timetableApi from '../../api/timetableApi';
 import * as academicsApi from '../../api/academicsApi';
-import { holidays } from '../../data/mockData';
+import { readWithFallback } from '../../api/mockFallback';
+import { listTable, deriveStudentAttendance, deriveResultsByStudent, deriveClassTimetable } from '../../data/mockStore';
 
 const DAY_ORDER = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
 
@@ -36,16 +37,27 @@ function Dashboard({ student }) {
 
   useEffect(() => {
     if (!student.studentId) return;
-    attendanceApi.getStudentAttendance(student.studentId).then(setAttSummary).catch(() => setAttSummary(null));
-    academicsApi.getResultsByStudent(student.studentId).then(setMyResults).catch(() => setMyResults([]));
+    readWithFallback(
+      () => attendanceApi.getStudentAttendance(student.studentId),
+      () => deriveStudentAttendance(student.studentId),
+      { label: 'getStudentAttendance' },
+    ).then(setAttSummary);
+    readWithFallback(
+      () => academicsApi.getResultsByStudent(student.studentId),
+      () => deriveResultsByStudent(student.studentId),
+      { label: 'getResultsByStudent' },
+    ).then(setMyResults);
   }, [student.studentId]);
 
   useEffect(() => {
     let active = true;
     if (!student.classId) { setSlotsLoading(false); return; }
-    timetableApi.getClassTimetable(student.classId)
+    readWithFallback(
+      () => timetableApi.getClassTimetable(student.classId),
+      () => deriveClassTimetable(student.classId),
+      { label: 'getClassTimetable' },
+    )
       .then(data => { if (active) setTodaySlots(data.filter(s => s.dayOfWeek === todayDayOfWeek())); })
-      .catch(() => { if (active) setTodaySlots([]); })
       .finally(() => { if (active) setSlotsLoading(false); });
     return () => { active = false; };
   }, [student.classId]);
@@ -186,15 +198,17 @@ function Dashboard({ student }) {
 function Timetable({ student }) {
   const [slots,       setSlots]       = useState([]);
   const [loading,     setLoading]     = useState(true);
-  const [error,       setError]       = useState('');
   const [selectedDay, setSelectedDay] = useState(todayDayOfWeek());
 
   useEffect(() => {
     let active = true;
     if (!student.classId) { setLoading(false); return; }
-    timetableApi.getClassTimetable(student.classId)
+    readWithFallback(
+      () => timetableApi.getClassTimetable(student.classId),
+      () => deriveClassTimetable(student.classId),
+      { label: 'getClassTimetable' },
+    )
       .then(data => { if (active) setSlots(data); })
-      .catch(err => { if (active) setError(err.message || 'Failed to load timetable'); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [student.classId]);
@@ -215,8 +229,6 @@ function Timetable({ student }) {
             onClick={() => setSelectedDay(d)}>{dayLabel(d)}</div>
         ))}
       </div>
-
-      {error && <div className="alert alert-danger mb-12">{error}</div>}
 
       <div className="card">
         <div className="card-body" style={{ padding: 0 }}>
@@ -421,13 +433,15 @@ function ExamSchedule({ student }) {
 function PastPapers({ student }) {
   const [papers,  setPapers]  = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error,   setError]   = useState('');
 
   useEffect(() => {
     let active = true;
-    academicsApi.listQuestionPapers()
+    readWithFallback(
+      () => academicsApi.listQuestionPapers(),
+      () => listTable('questionPapers'),
+      { label: 'listQuestionPapers' },
+    )
       .then(data => { if (active) setPapers(data); })
-      .catch(err => { if (active) setError(err.message || 'Failed to load question papers'); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, []);
@@ -443,8 +457,6 @@ function PastPapers({ student }) {
           <p>Question papers for your class</p>
         </div>
       </div>
-
-      {error && <div className="alert alert-danger mb-12">{error}</div>}
 
       <div className="card">
         <div className="table-wrapper">
@@ -486,9 +498,12 @@ function Results({ student }) {
 
   useEffect(() => {
     if (!student.studentId) { setLoading(false); return; }
-    academicsApi.getResultsByStudent(student.studentId)
+    readWithFallback(
+      () => academicsApi.getResultsByStudent(student.studentId),
+      () => deriveResultsByStudent(student.studentId),
+      { label: 'getResultsByStudent' },
+    )
       .then(setMyResults)
-      .catch(() => setMyResults([]))
       .finally(() => setLoading(false));
   }, [student.studentId]);
 
@@ -594,9 +609,12 @@ function AttendanceView({ student }) {
     if (!student.studentId) return;
     setLoading(true);
     setLoadError('');
-    attendanceApi.getStudentAttendance(student.studentId)
+    readWithFallback(
+      () => attendanceApi.getStudentAttendance(student.studentId),
+      () => deriveStudentAttendance(student.studentId),
+      { label: 'getStudentAttendance' },
+    )
       .then(setAttSummary)
-      .catch(err => setLoadError(err.message || 'Failed to load attendance.'))
       .finally(() => setLoading(false));
   }, [student.studentId]);
 
@@ -697,7 +715,8 @@ function AttendanceView({ student }) {
 
 /* ── Holidays ──────────────────────────────────────────────── */
 function HolidayList() {
-  const upcoming = holidays.filter(h => new Date(h.date) >= new Date('2026-08-04'));
+  const { holidays } = useData();
+  const upcoming = holidays.filter(h => new Date(h.date) >= new Date());
   const badgeColors = { National: 'badge-danger', Festival: 'badge-warning', Regional: 'badge-purple' };
 
   return (
@@ -716,7 +735,7 @@ function HolidayList() {
               <thead><tr><th>#</th><th>Date</th><th>Day</th><th>Holiday Name</th><th>Type</th><th>Description</th></tr></thead>
               <tbody>
                 {holidays.map(h => {
-                  const isPast = new Date(h.date) < new Date('2026-08-04');
+                  const isPast = new Date(h.date) < new Date();
                   return (
                     <tr key={h.id} style={{ opacity: isPast ? 0.5 : 1 }}>
                       <td style={{ fontSize: 12, color:'var(--text-muted)' }}>{h.id}</td>

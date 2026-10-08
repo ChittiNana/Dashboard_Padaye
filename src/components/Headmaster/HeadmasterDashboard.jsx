@@ -4,6 +4,11 @@ import { useAuth } from '../../context/AuthContext';
 import * as attendanceApi from '../../api/attendanceApi';
 import * as timetableApi from '../../api/timetableApi';
 import * as reportingApi from '../../api/reportingApi';
+import { readWithFallback } from '../../api/mockFallback';
+import {
+  deriveClassTimetable, deriveSchoolAttendanceSummary, deriveAttendanceReport,
+  deriveExamResultsReport, deriveStaffPerformanceReport,
+} from '../../data/mockStore';
 import Registration          from '../Auth/Registration';
 import QuestionPaperManagement from '../Exams/QuestionPaperManagement';
 import ClassManagement        from '../Management/ClassManagement';
@@ -48,7 +53,11 @@ function Dashboard() {
 
   const [attSummary, setAttSummary] = useState(null);
   useEffect(() => {
-    attendanceApi.getSchoolSummary().then(setAttSummary).catch(() => setAttSummary(null));
+    readWithFallback(
+      () => attendanceApi.getSchoolSummary(),
+      () => deriveSchoolAttendanceSummary(),
+      { label: 'getSchoolSummary' },
+    ).then(setAttSummary);
   }, []);
 
   return (
@@ -149,7 +158,6 @@ function TimetableView() {
   const [selectedClassId, setSelectedClassId] = useState(null);
   const [slots,   setSlots]   = useState([]);
   const [loading, setLoading] = useState(false);
-  const [error,   setError]   = useState('');
   const subjectColors = {
     Mathematics: '#ebf8ff', Science: '#f0fff4', English: '#faf5ff',
     History: '#fffaf0', Geography: '#e6fffa', Computer: '#fff5f5',
@@ -164,10 +172,12 @@ function TimetableView() {
     let active = true;
     if (selectedClassId === null) return;
     setLoading(true);
-    setError('');
-    timetableApi.getClassTimetable(selectedClassId)
+    readWithFallback(
+      () => timetableApi.getClassTimetable(selectedClassId),
+      () => deriveClassTimetable(selectedClassId),
+      { label: 'getClassTimetable' },
+    )
       .then(data => { if (active) setSlots(data); })
-      .catch(err => { if (active) setError(err.message || 'Failed to load timetable'); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [selectedClassId]);
@@ -183,7 +193,6 @@ function TimetableView() {
           {classes.map(c => <option key={c.id} value={c.id}>Class {c.name}</option>)}
         </select>
       </div>
-      {error && <div className="alert alert-danger mb-12">{error}</div>}
       <div className="card">
         <div className="card-header">
           <div className="card-title">Class {selectedClass?.name || '—'} Weekly Schedule</div>
@@ -283,25 +292,26 @@ function StudentsView() {
 
 /* ── Reports ───────────────────────────────────────────────── */
 const HEADMASTER_REPORTS = [
-  { key: 'attendance',        icon: '✅', title: 'Attendance Summary', color: 'bg-green',  fetch: reportingApi.getAttendanceReport },
-  { key: 'exam-results',      icon: '📋', title: 'Exam Analysis',      color: 'bg-blue',   fetch: reportingApi.getExamResultsReport },
-  { key: 'staff-performance', icon: '👔', title: 'Staff Performance',  color: 'bg-orange', fetch: reportingApi.getStaffPerformanceReport },
+  { key: 'attendance',        icon: '✅', title: 'Attendance Summary', color: 'bg-green',  fetch: reportingApi.getAttendanceReport,       fallback: deriveAttendanceReport },
+  { key: 'exam-results',      icon: '📋', title: 'Exam Analysis',      color: 'bg-blue',   fetch: reportingApi.getExamResultsReport,      fallback: deriveExamResultsReport },
+  { key: 'staff-performance', icon: '👔', title: 'Staff Performance',  color: 'bg-orange', fetch: reportingApi.getStaffPerformanceReport, fallback: deriveStaffPerformanceReport },
 ];
 
 function Reports() {
   const [activeKey, setActiveKey] = useState(null);
   const [data,      setData]      = useState(null);
   const [loading,   setLoading]   = useState(false);
-  const [error,     setError]     = useState('');
 
   const generate = (report) => {
     setActiveKey(report.key);
     setData(null);
-    setError('');
     setLoading(true);
-    report.fetch()
+    readWithFallback(
+      () => report.fetch(),
+      () => report.fallback(),
+      { label: report.key },
+    )
       .then(setData)
-      .catch(err => setError(err.message || 'Failed to load report.'))
       .finally(() => setLoading(false));
   };
 
@@ -333,7 +343,6 @@ function Reports() {
           </div>
           <div className="card-body">
             {loading && <p style={{ fontSize: 13, color:'var(--text-muted)' }}>Loading…</p>}
-            {error && <div className="alert alert-danger mb-8" style={{ fontSize: 12 }}>{error}</div>}
 
             {data && activeKey === 'attendance' && (
               <div className="stat-grid">

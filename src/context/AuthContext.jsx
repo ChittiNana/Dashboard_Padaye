@@ -2,6 +2,8 @@ import { createContext, useContext, useState, useCallback, useEffect, useMemo } 
 import * as authApi from '../api/authApi';
 import * as peopleApi from '../api/peopleApi';
 import { decodeToken, isExpired, setTokens, clearTokens, getAccessToken } from '../api/tokenStorage';
+import { readWithFallback, writeThroughMock } from '../api/mockFallback';
+import { listTable, getById, insertRecord } from '../data/mockStore';
 
 const AuthContext = createContext(null);
 
@@ -61,14 +63,22 @@ export function AuthProvider({ children }) {
     }
     try {
       if (['principal', 'headmaster', 'teacher'].includes(user.role)) {
-        const students = await peopleApi.listStudents();
+        const students = await readWithFallback(
+          () => peopleApi.listStudents(),
+          () => listTable('students'),
+          { label: 'listStudents' },
+        );
         setAllStudents(students.map(toStudentView));
       } else {
         setAllStudents([]);
       }
 
       if (['principal', 'headmaster'].includes(user.role)) {
-        const staff = await peopleApi.listStaff();
+        const staff = await readWithFallback(
+          () => peopleApi.listStaff(),
+          () => listTable('staff'),
+          { label: 'listStaff' },
+        );
         setAllStaff(staff.map(toStaffView));
       } else {
         setAllStaff([]);
@@ -77,30 +87,46 @@ export function AuthProvider({ children }) {
       let selfPatch = null;
 
       if (user.role === 'student') {
-        const self = await peopleApi.getMyStudentRecord();
-        selfPatch = {
-          studentId: self.id,
-          classId: self.classId,
-          admissionNumber: self.admissionNumber,
-          firstName: self.firstName,
-          lastName: self.lastName,
-          name: personName(self),
-          avatar: personAvatar(self),
-        };
+        const self = await readWithFallback(
+          () => peopleApi.getMyStudentRecord(),
+          () => getById('students', user.id),
+          { label: 'getMyStudentRecord' },
+        );
+        if (self) {
+          selfPatch = {
+            studentId: self.id,
+            classId: self.classId,
+            admissionNumber: self.admissionNumber,
+            firstName: self.firstName,
+            lastName: self.lastName,
+            name: personName(self),
+            avatar: personAvatar(self),
+          };
+        }
       } else if (STAFF_ROLES.includes(user.role)) {
-        const self = await peopleApi.getMyStaffRecord();
-        selfPatch = {
-          staffId: self.id,
-          staffCode: self.staffCode,
-          firstName: self.firstName,
-          lastName: self.lastName,
-          name: personName(self),
-          avatar: personAvatar(self),
-          email: self.email,
-          phone: self.phone,
-        };
+        const self = await readWithFallback(
+          () => peopleApi.getMyStaffRecord(),
+          () => getById('staff', user.id),
+          { label: 'getMyStaffRecord' },
+        );
+        if (self) {
+          selfPatch = {
+            staffId: self.id,
+            staffCode: self.staffCode,
+            firstName: self.firstName,
+            lastName: self.lastName,
+            name: personName(self),
+            avatar: personAvatar(self),
+            email: self.email,
+            phone: self.phone,
+          };
+        }
       } else if (user.role === 'parent') {
-        const kids = await peopleApi.getChildrenForParent(user.id);
+        const kids = await readWithFallback(
+          () => peopleApi.getChildrenForParent(user.id),
+          () => listTable('students').filter((s) => String(s.parentUserId) === String(user.id)),
+          { label: 'getChildrenForParent' },
+        );
         setMyChildren(kids.map(toStudentView));
       }
 
@@ -127,6 +153,21 @@ export function AuthProvider({ children }) {
       setError('');
       return true;
     } catch (err) {
+      const mockUser = listTable('users').find(
+        (u) => u.username === username && u.password === password,
+      );
+      if (mockUser) {
+        console.warn('[mock-fallback] login failed, using local demo account', err);
+        clearTokens();
+        setCurrentUser({
+          id: mockUser.id,
+          username: mockUser.username,
+          roles: [mockUser.role.toUpperCase()],
+          role: mockUser.role,
+        });
+        setError('');
+        return true;
+      }
       clearTokens();
       setCurrentUser(null);
       setError(err.message || 'Invalid username or password.');
@@ -140,9 +181,19 @@ export function AuthProvider({ children }) {
     setError('');
   }, []);
 
-  const registerUser = useCallback(async (userData) => {
-    return authApi.register(userData);
-  }, []);
+  const registerUser = useCallback((userData) => writeThroughMock(
+    () => insertRecord('users', {
+      username: userData.username,
+      password: userData.password,
+      role: userData.role.toLowerCase(),
+      name: userData.fullName,
+      avatar: userData.fullName.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase(),
+      email: userData.email,
+      joinDate: new Date().toISOString().slice(0, 10),
+    }),
+    () => authApi.register(userData),
+    { label: 'registerUser' },
+  ), []);
 
   const allUsers = useMemo(() => [...allStaff, ...allStudents], [allStaff, allStudents]);
 

@@ -4,6 +4,11 @@ import { useAuth } from '../../context/AuthContext';
 import * as attendanceApi from '../../api/attendanceApi';
 import * as reportingApi from '../../api/reportingApi';
 import { schoolInfo } from '../../data/mockData';
+import { readWithFallback } from '../../api/mockFallback';
+import {
+  deriveSchoolAttendanceSummary, deriveAttendanceReport, deriveExamResultsReport,
+  deriveFeeCollectionReport, deriveStaffPerformanceReport, deriveAnalytics,
+} from '../../data/mockStore';
 import Registration          from '../Auth/Registration';
 import QuestionPaperManagement from '../Exams/QuestionPaperManagement';
 import ClassManagement        from '../Management/ClassManagement';
@@ -39,7 +44,11 @@ function Dashboard() {
 
   const [attSummary, setAttSummary] = useState(null);
   useEffect(() => {
-    attendanceApi.getSchoolSummary().then(setAttSummary).catch(() => setAttSummary(null));
+    readWithFallback(
+      () => attendanceApi.getSchoolSummary(),
+      () => deriveSchoolAttendanceSummary(),
+      { label: 'getSchoolSummary' },
+    ).then(setAttSummary);
   }, []);
   const presentToday = attSummary?.presentToday ?? '—';
 
@@ -300,26 +309,27 @@ function AllStudents() {
 
 /* ── Reports ───────────────────────────────────────────────── */
 const PRINCIPAL_REPORTS = [
-  { key: 'attendance',        icon: '✅', title: 'Attendance Report',     desc: "Today's school-wide attendance",       color: 'bg-green',  fetch: reportingApi.getAttendanceReport },
-  { key: 'exam-results',      icon: '📋', title: 'Exam Results Report',  desc: 'Exams and recorded results',            color: 'bg-teal',   fetch: reportingApi.getExamResultsReport },
-  { key: 'fee-collection',    icon: '💰', title: 'Fee Collection Report', desc: 'Billed, collected and outstanding fees', color: 'bg-orange', fetch: reportingApi.getFeeCollectionReport },
-  { key: 'staff-performance', icon: '👔', title: 'Staff Report',          desc: 'Staff counts by role',                   color: 'bg-purple', fetch: reportingApi.getStaffPerformanceReport },
+  { key: 'attendance',        icon: '✅', title: 'Attendance Report',     desc: "Today's school-wide attendance",       color: 'bg-green',  fetch: reportingApi.getAttendanceReport,       fallback: deriveAttendanceReport },
+  { key: 'exam-results',      icon: '📋', title: 'Exam Results Report',  desc: 'Exams and recorded results',            color: 'bg-teal',   fetch: reportingApi.getExamResultsReport,      fallback: deriveExamResultsReport },
+  { key: 'fee-collection',    icon: '💰', title: 'Fee Collection Report', desc: 'Billed, collected and outstanding fees', color: 'bg-orange', fetch: reportingApi.getFeeCollectionReport,    fallback: deriveFeeCollectionReport },
+  { key: 'staff-performance', icon: '👔', title: 'Staff Report',          desc: 'Staff counts by role',                   color: 'bg-purple', fetch: reportingApi.getStaffPerformanceReport, fallback: deriveStaffPerformanceReport },
 ];
 
 function Reports() {
   const [activeKey, setActiveKey] = useState(null);
   const [data,      setData]      = useState(null);
   const [loading,   setLoading]   = useState(false);
-  const [error,     setError]     = useState('');
 
   const generate = (report) => {
     setActiveKey(report.key);
     setData(null);
-    setError('');
     setLoading(true);
-    report.fetch()
+    readWithFallback(
+      () => report.fetch(),
+      () => report.fallback(),
+      { label: report.key },
+    )
       .then(setData)
-      .catch(err => setError(err.message || 'Failed to load report.'))
       .finally(() => setLoading(false));
   };
 
@@ -349,7 +359,6 @@ function Reports() {
           </div>
           <div className="card-body">
             {loading && <p style={{ fontSize: 13, color:'var(--text-muted)' }}>Loading…</p>}
-            {error && <div className="alert alert-danger mb-8" style={{ fontSize: 12 }}>{error}</div>}
 
             {data && activeKey === 'attendance' && (
               <div className="stat-grid">
@@ -405,7 +414,11 @@ function Analytics() {
 
   const [analytics, setAnalytics] = useState(null);
   useEffect(() => {
-    reportingApi.getAnalytics().then(setAnalytics).catch(() => setAnalytics(null));
+    readWithFallback(
+      () => reportingApi.getAnalytics(),
+      () => deriveAnalytics(),
+      { label: 'getAnalytics' },
+    ).then(setAnalytics);
   }, []);
 
   const pctOf = (r) => Math.round((r.marksObtained / r.maxMarks) * 100);

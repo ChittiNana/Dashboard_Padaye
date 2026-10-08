@@ -4,8 +4,8 @@ import { useData } from '../../context/DataContext';
 import * as attendanceApi from '../../api/attendanceApi';
 import * as feeApi from '../../api/feeApi';
 import * as academicsApi from '../../api/academicsApi';
-import { users, messages, holidays } from '../../data/mockData';
-
+import { readWithFallback, writeThroughMock } from '../../api/mockFallback';
+import { deriveStudentAttendance, deriveStudentFeeStatus, applyPayFee, deriveResultsByStudent } from '../../data/mockStore';
 function todayISO() { return new Date().toISOString().slice(0, 10); }
 
 /* ── Dashboard ──────────────────────────────────────────────── */
@@ -16,19 +16,31 @@ function Dashboard({ parent, children }) {
   const [attSummary, setAttSummary] = useState(null);
   useEffect(() => {
     if (!child) return;
-    attendanceApi.getStudentAttendance(child.id).then(setAttSummary).catch(() => setAttSummary(null));
+    readWithFallback(
+      () => attendanceApi.getStudentAttendance(child.id),
+      () => deriveStudentAttendance(child.id),
+      { label: 'getStudentAttendance' },
+    ).then(setAttSummary);
   }, [child]);
 
   const [feeStatus, setFeeStatus] = useState(null);
   useEffect(() => {
     if (!child) return;
-    feeApi.getStatusForStudent(child.id).then(setFeeStatus).catch(() => setFeeStatus(null));
+    readWithFallback(
+      () => feeApi.getStatusForStudent(child.id),
+      () => deriveStudentFeeStatus(child.id),
+      { label: 'getStatusForStudent' },
+    ).then(setFeeStatus);
   }, [child]);
 
   const [myResults, setMyResults] = useState([]);
   useEffect(() => {
     if (!child) return;
-    academicsApi.getResultsByStudent(child.id).then(setMyResults).catch(() => setMyResults([]));
+    readWithFallback(
+      () => academicsApi.getResultsByStudent(child.id),
+      () => deriveResultsByStudent(child.id),
+      { label: 'getResultsByStudent' },
+    ).then(setMyResults);
   }, [child]);
 
   if (!child) return <div className="empty-state"><div className="empty-state-icon">👶</div><h3>No children linked</h3></div>;
@@ -181,15 +193,16 @@ function AttendanceView({ children }) {
 
   const [attSummary, setAttSummary] = useState(null);
   const [loading,    setLoading]    = useState(false);
-  const [loadError,  setLoadError]  = useState('');
 
   useEffect(() => {
     if (!child) return;
     setLoading(true);
-    setLoadError('');
-    attendanceApi.getStudentAttendance(child.id)
+    readWithFallback(
+      () => attendanceApi.getStudentAttendance(child.id),
+      () => deriveStudentAttendance(child.id),
+      { label: 'getStudentAttendance' },
+    )
       .then(setAttSummary)
-      .catch(err => setLoadError(err.message || 'Failed to load attendance.'))
       .finally(() => setLoading(false));
   }, [child]);
 
@@ -207,8 +220,6 @@ function AttendanceView({ children }) {
           <p>Class {childClassName}</p>
         </div>
       </div>
-
-      {loadError && <div className="alert alert-danger mb-20">{loadError}</div>}
 
       <div className="stat-grid mb-20">
         {[['✅','Present', present,   'bg-green'],
@@ -259,9 +270,12 @@ function ExamResults({ children }) {
 
   useEffect(() => {
     if (!child) { setLoading(false); return; }
-    academicsApi.getResultsByStudent(child.id)
+    readWithFallback(
+      () => academicsApi.getResultsByStudent(child.id),
+      () => deriveResultsByStudent(child.id),
+      { label: 'getResultsByStudent' },
+    )
       .then(setMyResults)
-      .catch(() => setMyResults([]))
       .finally(() => setLoading(false));
   }, [child]);
 
@@ -366,7 +380,6 @@ function FeeStatus({ children }) {
   const child = children[0];
   const [feeStatus, setFeeStatus] = useState(null);
   const [loading,   setLoading]   = useState(false);
-  const [loadError, setLoadError] = useState('');
 
   const [showPay,     setShowPay]     = useState(false);
   const [payAmount,   setPayAmount]   = useState('');
@@ -378,31 +391,35 @@ function FeeStatus({ children }) {
   const load = () => {
     if (!child) return;
     setLoading(true);
-    setLoadError('');
-    feeApi.getStatusForStudent(child.id)
+    readWithFallback(
+      () => feeApi.getStatusForStudent(child.id),
+      () => deriveStudentFeeStatus(child.id),
+      { label: 'getStatusForStudent' },
+    )
       .then(setFeeStatus)
-      .catch(err => setLoadError(err.message || 'Failed to load fee status.'))
       .finally(() => setLoading(false));
   };
 
   useEffect(load, [child]);
 
-  const submitPay = async () => {
+  const submitPay = () => {
     const amount = Number(payAmount);
     if (!amount || amount <= 0) { setPayError('Enter a valid amount.'); return; }
     setPaySubmitting(true);
     setPayError('');
-    try {
-      await feeApi.payFee({ feeRecordId: feeStatus.feeRecordId, amount, method: payMethod, reference: payRef || undefined });
-      setShowPay(false);
-      setPayAmount('');
-      setPayRef('');
-      load();
-    } catch (err) {
-      setPayError(err.message || 'Payment failed.');
-    } finally {
-      setPaySubmitting(false);
-    }
+    const updated = writeThroughMock(
+      () => {
+        applyPayFee({ feeRecordId: feeStatus.feeRecordId, amount, method: payMethod, reference: payRef || undefined });
+        return deriveStudentFeeStatus(child.id);
+      },
+      () => feeApi.payFee({ feeRecordId: feeStatus.feeRecordId, amount, method: payMethod, reference: payRef || undefined }),
+      { label: 'payFee' },
+    );
+    setFeeStatus(updated);
+    setShowPay(false);
+    setPayAmount('');
+    setPayRef('');
+    setPaySubmitting(false);
   };
 
   return (
@@ -413,8 +430,6 @@ function FeeStatus({ children }) {
           <p>Academic Year {feeStatus?.academicYear || '—'}</p>
         </div>
       </div>
-
-      {loadError && <div className="alert alert-danger mb-20">{loadError}</div>}
 
       {loading ? (
         <div className="card"><div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)' }}>Loading…</div></div>
@@ -467,6 +482,7 @@ function FeeStatus({ children }) {
 /* ── Contact Teacher ────────────────────────────────────────── */
 function ContactTeacher({ parent, children }) {
   const { allStaff } = useAuth();
+  const { addMessage } = useData();
   const child = children[0];
   const teachers = allStaff.filter(u => u.role === 'teacher');
   const [selected, setSelected] = useState(null);
@@ -476,6 +492,7 @@ function ContactTeacher({ parent, children }) {
 
   const handleSend = () => {
     if (!selected || !subject || !body) return;
+    addMessage({ fromId: parent.id, toId: selected.id, subject, body });
     setSent(true);
     setSubject(''); setBody(''); setSelected(null);
     setTimeout(() => setSent(false), 3000);
@@ -539,6 +556,7 @@ function ContactTeacher({ parent, children }) {
 
 /* ── Messages ──────────────────────────────────────────────── */
 function MessagesView({ parent }) {
+  const { messages, directoryUsers } = useData();
   const myMessages = messages.filter(m => m.toId === parent.id || m.fromId === parent.id);
 
   return (
@@ -547,7 +565,7 @@ function MessagesView({ parent }) {
       <div className="card">
         <div className="card-body" style={{ padding:0 }}>
           {myMessages.map(m => {
-            const other = users.find(u => u.id === (m.fromId === parent.id ? m.toId : m.fromId));
+            const other = directoryUsers.find(u => u.id === (m.fromId === parent.id ? m.toId : m.fromId));
             const isSent = m.fromId === parent.id;
             return (
               <div key={m.id} style={{ padding:'14px 20px', borderBottom:'1px solid var(--border)' }}>
@@ -596,8 +614,9 @@ function Notices() {
 
 /* ── Academic Calendar ─────────────────────────────────────── */
 function AcademicCalendar() {
+  const { holidays } = useData();
   const badgeColors = { National:'badge-danger', Festival:'badge-warning', Regional:'badge-purple' };
-  const upcoming = holidays.filter(h => new Date(h.date) >= new Date('2026-08-04'));
+  const upcoming = holidays.filter(h => new Date(h.date) >= new Date(todayISO()));
 
   return (
     <div>

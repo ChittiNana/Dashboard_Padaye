@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
-import { users, messages } from '../../data/mockData';
 import * as timetableApi from '../../api/timetableApi';
+import { readWithFallback } from '../../api/mockFallback';
+import { deriveTeacherTimetable } from '../../data/mockStore';
 import QuestionPaperManagement  from '../Exams/QuestionPaperManagement';
 import AttendanceManagement     from '../Management/AttendanceManagement';
 import HomeworkManagement       from '../Management/HomeworkManagement';
@@ -46,7 +47,7 @@ function StatCard({ icon, label, value, color }) {
 
 /* ── Dashboard ──────────────────────────────────────────────── */
 function Dashboard({ teacher }) {
-  const { notes, homework, exams, classes } = useData();
+  const { notes, homework, exams, classes, messages, directoryUsers } = useData();
   const { allUsers } = useAuth();
 
   const [todaySlots,   setTodaySlots]   = useState([]);
@@ -55,9 +56,12 @@ function Dashboard({ teacher }) {
   useEffect(() => {
     let active = true;
     if (!teacher.staffId) { setSlotsLoading(false); return; }
-    timetableApi.getTeacherTimetable(teacher.staffId)
+    readWithFallback(
+      () => timetableApi.getTeacherTimetable(teacher.staffId),
+      () => deriveTeacherTimetable(teacher.staffId),
+      { label: 'getTeacherTimetable' },
+    )
       .then(data => { if (active) setTodaySlots(data.filter(s => s.dayOfWeek === todayDayOfWeek())); })
-      .catch(() => { if (active) setTodaySlots([]); })
       .finally(() => { if (active) setSlotsLoading(false); });
     return () => { active = false; };
   }, [teacher.staffId]);
@@ -166,7 +170,7 @@ function Dashboard({ teacher }) {
           </div>
           <div className="card-body" style={{ padding: 0 }}>
             {messages.filter(m => m.toId === teacher.id || m.fromId === teacher.id).map(m => {
-              const sender = users.find(u => u.id === m.fromId);
+              const sender = directoryUsers.find(u => u.id === m.fromId);
               return (
                 <div key={m.id} style={{ padding:'10px 20px', borderBottom:'1px solid var(--border)' }}>
                   <div style={{ display:'flex', gap: 8, alignItems:'flex-start' }}>
@@ -339,14 +343,16 @@ function TeacherTimetable({ teacher }) {
   const { classes } = useData();
   const [slots,   setSlots]   = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error,   setError]   = useState('');
 
   useEffect(() => {
     let active = true;
     if (!teacher.staffId) { setLoading(false); return; }
-    timetableApi.getTeacherTimetable(teacher.staffId)
+    readWithFallback(
+      () => timetableApi.getTeacherTimetable(teacher.staffId),
+      () => deriveTeacherTimetable(teacher.staffId),
+      { label: 'getTeacherTimetable' },
+    )
       .then(data => { if (active) setSlots(data); })
-      .catch(err => { if (active) setError(err.message || 'Failed to load timetable'); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [teacher.staffId]);
@@ -359,8 +365,7 @@ function TeacherTimetable({ teacher }) {
   return (
     <div>
       <div className="page-header"><div className="page-header-left"><h1>My Timetable</h1></div></div>
-      {error && <div className="alert alert-danger mb-12">{error}</div>}
-      {!loading && slots.length === 0 && !error && (
+      {!loading && slots.length === 0 && (
         <div className="card"><div className="card-body" style={{ textAlign:'center', color:'var(--text-muted)' }}>
           No timetable slots assigned yet.
         </div></div>
@@ -424,8 +429,23 @@ function ExamsView({ teacher }) {
 
 /* ── Messages ──────────────────────────────────────────────── */
 function MessagesView({ teacher }) {
+  const { messages, directoryUsers, addMessage } = useData();
+  const recipients = directoryUsers.filter(u => ['parent', 'headmaster', 'principal'].includes(u.role));
+
   const [compose, setCompose] = useState(false);
+  const [toId,    setToId]    = useState('');
+  const [subject, setSubject] = useState('');
+  const [body,    setBody]    = useState('');
+
   const myMessages = messages.filter(m => m.toId === teacher.id || m.fromId === teacher.id);
+
+  const handleSend = () => {
+    if (!toId || !subject || !body) return;
+    addMessage({ fromId: teacher.id, toId: Number(toId), subject, body });
+    setSubject('');
+    setBody('');
+    setCompose(false);
+  };
 
   return (
     <div>
@@ -440,15 +460,16 @@ function MessagesView({ teacher }) {
           <div className="card-body">
             <div className="form-group">
               <label className="form-label">To (Parent/Admin)</label>
-              <select className="form-control">
-                {users.filter(u => ['parent','headmaster','principal'].includes(u.role)).map(u => (
-                  <option key={u.id}>{u.name} ({u.role})</option>
+              <select className="form-control" value={toId} onChange={e => setToId(e.target.value)}>
+                <option value="">Select recipient…</option>
+                {recipients.map(u => (
+                  <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
                 ))}
               </select>
             </div>
-            <div className="form-group"><label className="form-label">Subject</label><input className="form-control" /></div>
-            <div className="form-group"><label className="form-label">Message</label><textarea className="form-control" rows={4} /></div>
-            <button className="btn btn-primary">Send</button>
+            <div className="form-group"><label className="form-label">Subject</label><input className="form-control" value={subject} onChange={e => setSubject(e.target.value)} /></div>
+            <div className="form-group"><label className="form-label">Message</label><textarea className="form-control" rows={4} value={body} onChange={e => setBody(e.target.value)} /></div>
+            <button className="btn btn-primary" onClick={handleSend}>Send</button>
           </div>
         </div>
       )}
@@ -456,7 +477,7 @@ function MessagesView({ teacher }) {
       <div className="card">
         <div className="card-body" style={{ padding: 0 }}>
           {myMessages.map(m => {
-            const other = users.find(u => u.id === (m.fromId === teacher.id ? m.toId : m.fromId));
+            const other = directoryUsers.find(u => u.id === (m.fromId === teacher.id ? m.toId : m.fromId));
             const isSent = m.fromId === teacher.id;
             return (
               <div key={m.id} style={{ padding:'14px 20px', borderBottom:'1px solid var(--border)' }}>

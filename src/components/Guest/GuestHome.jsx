@@ -1,7 +1,9 @@
 import { useState } from 'react';
-import { schoolInfo, holidays } from '../../data/mockData';
+import { schoolInfo } from '../../data/mockData';
+import { useData } from '../../context/DataContext';
 
 export default function GuestHome({ onLogin }) {
+  const { holidays } = useData();
   const badgeColors = { National:'badge-danger', Festival:'badge-warning', Regional:'badge-purple' };
   const [tab, setTab] = useState('about');
 
