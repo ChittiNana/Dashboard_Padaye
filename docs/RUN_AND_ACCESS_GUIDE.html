@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard Padaye — Run &amp; Access Guide</title>
+<style>
+  :root {
+    --ink: #1e293b; --muted: #64748b; --accent: #2563eb; --accent-light: #eff6ff;
+    --border: #e2e8f0; --green: #16a34a; --amber: #b45309;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; background: #f1f5f9; color: var(--ink); line-height: 1.55; }
+  header.hero { background: linear-gradient(135deg, #065f46, #16a34a 60%, #22c55e); color: #fff; padding: 44px 24px 32px; }
+  header.hero .wrap { max-width: 980px; margin: 0 auto; }
+  header.hero h1 { margin: 0 0 8px; font-size: 28px; }
+  header.hero p { margin: 0; opacity: .95; max-width: 760px; font-size: 15px; }
+  main { max-width: 980px; margin: -16px auto 60px; padding: 0 24px; }
+  .card { background: #fff; border: 1px solid var(--border); border-radius: 14px; padding: 24px 28px; margin-bottom: 22px; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
+  h2 { font-size: 19px; margin: 0 0 6px; display: flex; align-items: center; gap: 8px; }
+  .step-no { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 13px; font-weight: 700; flex-shrink: 0; }
+  h3 { font-size: 14.5px; margin: 18px 0 6px; color: var(--accent); }
+  p { font-size: 14.5px; color: #334155; }
+  pre { background: #0f172a; color: #e2e8f0; border-radius: 10px; padding: 14px 16px; overflow-x: auto; font-size: 13px; font-family: ui-monospace, Consolas, monospace; margin: 8px 0 4px; }
+  code { background: #f1f5f9; border: 1px solid var(--border); border-radius: 5px; padding: 1px 6px; font-size: 13px; font-family: ui-monospace, Consolas, monospace; color: #1e3a8a; }
+  pre code { background: none; border: none; padding: 0; color: inherit; }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; margin-top: 10px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  th { background: #f8fafc; color: #475569; font-size: 12px; text-transform: uppercase; letter-spacing: .03em; }
+  tr:last-child td { border-bottom: none; }
+  td code { white-space: nowrap; }
+  .role-badge { display: inline-block; font-size: 11.5px; font-weight: 700; padding: 2px 9px; border-radius: 999px; background: var(--accent-light); color: #1e3a8a; }
+  .note { background: #fffbeb; border: 1px solid #fde68a; border-radius: 10px; padding: 12px 16px; font-size: 13.5px; color: #78350f; margin-top: 10px; }
+  .ok { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px; padding: 12px 16px; font-size: 13.5px; color: #14532d; margin-top: 10px; }
+  .danger { background: #fef2f2; border: 1px solid #fecaca; border-radius: 10px; padding: 12px 16px; font-size: 13.5px; color: #7f1d1d; margin-top: 10px; }
+  ul { margin: 6px 0 0; padding-left: 20px; font-size: 14px; color: #334155; }
+  li { margin-bottom: 4px; }
+  .section-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .toc { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+  .toc a { font-size: 13px; background: #f8fafc; border: 1px solid var(--border); border-radius: 999px; padding: 5px 12px; color: var(--accent); text-decoration: none; }
+  footer { text-align: center; color: #94a3b8; font-size: 12.5px; padding: 24px 0 50px; }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <h1>🚀 Dashboard Padaye — Run &amp; Access Guide</h1>
+    <p>How to start the app on your laptop, log in, open it on a phone or another laptop, and (optionally) share it
+      with someone outside your network — plus every demo login.</p>
+    <div class="toc">
+      <a href="#prereqs">Prerequisites</a>
+      <a href="#run">Run locally</a>
+      <a href="#creds">Login credentials</a>
+      <a href="#same-network">Access from phone / another laptop</a>
+      <a href="#remote">Access from anywhere</a>
+      <a href="#data">About the demo data</a>
+      <a href="#troubleshoot">Troubleshooting</a>
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <div class="card" id="prereqs">
+    <div class="section-head"><span class="step-no">1</span><h2>Prerequisites</h2></div>
+    <ul>
+      <li><a href="https://nodejs.org/">Node.js</a> 18+ and npm (comes bundled with Node)</li>
+      <li>Git, and access to clone <code>github.com/ChittiNana/Dashboard_Padaye</code></li>
+      <li>No backend/database needed — the app works stand-alone (see "About the demo data" below)</li>
+    </ul>
+  </div>
+
+  <div class="card" id="run">
+    <div class="section-head"><span class="step-no">2</span><h2>Run it locally</h2></div>
+    <pre><code>git clone https://github.com/ChittiNana/Dashboard_Padaye.git
+cd Dashboard_Padaye
+git checkout feature/ui-mock-data-layer
+
+npm install
+npm start</code></pre>
+    <p>This opens the Create React App dev server. It automatically launches your browser at
+      <code>http://localhost:3000</code> — if it doesn't, open that URL yourself.</p>
+    <div class="ok">The terminal will print two URLs once it's ready — something like:<br>
+      <code>Local:&nbsp;&nbsp;&nbsp;&nbsp;http://localhost:3000</code><br>
+      <code>On Your Network:&nbsp;http://192.168.x.x:3000</code><br>
+      Keep that second one handy — it's what other devices on your Wi-Fi use (see below).</div>
+    <p>To stop the server, go back to that terminal and press <code>Ctrl+C</code>.</p>
+  </div>
+
+  <div class="card" id="creds">
+    <div class="section-head"><span class="step-no">3</span><h2>Login credentials (demo accounts)</h2></div>
+    <p>These work with or without a real backend running — if the live login call fails, the app checks these same
+      credentials against its local demo data instead.</p>
+    <table>
+      <thead><tr><th>Role</th><th>Username</th><th>Password</th><th>Name</th></tr></thead>
+      <tbody>
+        <tr><td><span class="role-badge">Principal</span></td><td><code>principal</code></td><td><code>principal123</code></td><td>Dr. Rajesh Kumar</td></tr>
+        <tr><td><span class="role-badge">Headmaster</span></td><td><code>headmaster</code></td><td><code>head123</code></td><td>Mrs. Priya Sharma</td></tr>
+        <tr><td><span class="role-badge">Teacher</span></td><td><code>teacher1</code></td><td><code>teach123</code></td><td>Mr. Amit Verma</td></tr>
+        <tr><td><span class="role-badge">Teacher</span></td><td><code>teacher2</code> … <code>teacher5</code></td><td><code>teach123</code></td><td>other teaching staff</td></tr>
+        <tr><td><span class="role-badge">Student</span></td><td><code>student1</code></td><td><code>stud123</code></td><td>Rahul Singh</td></tr>
+        <tr><td><span class="role-badge">Student</span></td><td><code>student2</code> / <code>student3</code></td><td><code>stud123</code></td><td>Priya Kapoor / Arjun Mehta</td></tr>
+        <tr><td><span class="role-badge">Parent</span></td><td><code>parent1</code></td><td><code>par123</code></td><td>Mr. Ravi Singh</td></tr>
+        <tr><td><span class="role-badge">Parent</span></td><td><code>parent2</code> / <code>parent3</code></td><td><code>par123</code></td><td>Mrs. Anita Kapoor / Mr. Suresh Mehta</td></tr>
+        <tr><td><span class="role-badge">Accountant</span></td><td><code>accountant1</code></td><td><code>acc123</code></td><td>Ms. Kavya Sharma</td></tr>
+        <tr><td><span class="role-badge">Support Staff</span></td><td><code>gatekeeper1</code></td><td><code>gate123</code></td><td>Mr. Ramesh Kumar</td></tr>
+        <tr><td><span class="role-badge">Guest</span></td><td><code>guest</code></td><td><code>guest</code></td><td>Guest User</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card" id="same-network">
+    <div class="section-head"><span class="step-no">4</span><h2>Open it on your phone or another laptop (same Wi-Fi)</h2></div>
+    <p>The dev server is reachable by any device on the <em>same Wi-Fi/LAN</em> as your laptop — no extra tools
+      needed.</p>
+    <ol style="font-size:14.5px; color:#334155; padding-left: 20px;">
+      <li>Make sure your phone/other laptop is connected to the <strong>same Wi-Fi network</strong> as the laptop
+        running <code>npm start</code>.</li>
+      <li>On that other device's browser, go to the <code>On Your Network</code> URL printed in the terminal, e.g.
+        <code>http://192.168.1.42:3000</code>.</li>
+      <li>If this is the first time, Windows may show a <strong>Windows Defender Firewall</strong> prompt asking to
+        allow Node.js on private/public networks — this only appears on the laptop running the server, and only
+        someone with permission to click through it should accept it.</li>
+    </ol>
+    <div class="note">⚠️ On an office/managed laptop, don't change firewall rules yourself if the prompt is
+      blocked or you're unsure — check with IT first. Many corporate Wi-Fi networks also enable
+      <strong>client isolation</strong>, which blocks device-to-device connections entirely even with the firewall
+      allowed — if the LAN URL doesn't load from another device, this is the most likely reason, and it isn't
+      something you can fix from your laptop. Use the tunnel option below instead.</div>
+  </div>
+
+  <div class="card" id="remote">
+    <div class="section-head"><span class="step-no">5</span><h2>Share it with someone outside your network</h2></div>
+    <p>For a viewer who is <em>not</em> on your Wi-Fi (a different office, home, another city), use an outbound-only
+      HTTPS tunnel — it needs no firewall changes and no router/port-forwarding setup, since the connection is
+      initiated from your laptop outward.</p>
+    <h3>Option A — ngrok</h3>
+    <pre><code># one-time: create a free account at ngrok.com and copy your authtoken
+ngrok config add-authtoken &lt;your-token&gt;
+
+# with "npm start" already running on port 3000, in a second terminal:
+ngrok http 3000</code></pre>
+    <p>ngrok prints a public URL like <code>https://abcd-1234.ngrok-free.app</code> — share that link; it forwards
+      straight to your local dev server.</p>
+    <h3>Option B — Cloudflare Tunnel (no account needed for a quick link)</h3>
+    <pre><code>cloudflared tunnel --url http://localhost:3000</code></pre>
+    <div class="danger">Only run a public tunnel from a machine and account you're allowed to install this kind of
+      tool on — not on a managed corporate laptop without checking policy first. Anyone with the generated link can
+      reach your running app for as long as the tunnel and dev server stay up, so close the tunnel when you're done
+      demoing.</div>
+  </div>
+
+  <div class="card" id="data">
+    <div class="section-head"><span class="step-no">6</span><h2>About the demo data</h2></div>
+    <ul>
+      <li>Everything you create, edit, or delete (students, attendance, fees, notices, question papers…) is saved
+        instantly in your browser's local storage, under the key <code>padaye_mock_store_v1</code>.</li>
+      <li>It <strong>survives logging out and logging back in as a different role</strong> — e.g. a teacher adds a
+        student, logs out, and the principal immediately sees it.</li>
+      <li>It <strong>survives a page reload</strong> too — it's not held only in memory.</li>
+      <li>It <strong>auto-resets after 24 hours</strong> back to the original demo dataset, so stale test data
+        doesn't pile up.</li>
+      <li>Each browser (and each incognito/private window) has its <em>own</em> separate copy — data created on one
+        device/browser won't appear on another.</li>
+    </ul>
+  </div>
+
+  <div class="card" id="troubleshoot">
+    <div class="section-head"><span class="step-no">7</span><h2>Troubleshooting</h2></div>
+    <h3>"Something is already running on port 3000"</h3>
+    <p>A previous <code>npm start</code> is probably still running (e.g. in another terminal, or a stale window). Find and close it, or let Create React App prompt you to run on the next free port instead.</p>
+    <h3>Phone/laptop on the same Wi-Fi can't load the page</h3>
+    <p>Check, in order: both devices on the exact same Wi-Fi network; the firewall prompt wasn't dismissed/blocked; the network doesn't enforce client isolation (common on corporate/guest Wi-Fi — switch to the tunnel option instead).</p>
+    <h3>Login fails for a valid demo account</h3>
+    <p>Double check the username/password are typed exactly as in the table above (all lowercase, no spaces).</p>
+    <h3>My changes disappeared</h3>
+    <p>Either more than 24 hours passed since the data was last seeded (auto-reset), or you're viewing from a different browser/device than the one you made the change on.</p>
+  </div>
+
+</main>
+<footer>Dashboard Padaye — generated run &amp; access guide</footer>
+</body>
+</html>

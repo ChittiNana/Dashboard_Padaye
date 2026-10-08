@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard Padaye — Application Overview</title>
+<style>
+  :root {
+    --bg: #0f172a; --card: #ffffff; --ink: #1e293b; --muted: #64748b;
+    --accent: #2563eb; --accent-light: #eff6ff; --border: #e2e8f0;
+    --green: #16a34a; --amber: #d97706; --red: #dc2626;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+    background: #f1f5f9; color: var(--ink); line-height: 1.55;
+  }
+  header.hero {
+    background: linear-gradient(135deg, #1e3a8a, #2563eb 60%, #3b82f6);
+    color: #fff; padding: 48px 24px 36px;
+  }
+  header.hero .wrap { max-width: 980px; margin: 0 auto; }
+  header.hero h1 { margin: 0 0 8px; font-size: 30px; }
+  header.hero p { margin: 0; opacity: .92; max-width: 760px; font-size: 15px; }
+  .pills { margin-top: 18px; display: flex; flex-wrap: wrap; gap: 8px; }
+  .pill {
+    background: rgba(255,255,255,.16); border: 1px solid rgba(255,255,255,.3);
+    border-radius: 999px; padding: 5px 14px; font-size: 13px; font-weight: 600;
+  }
+  main { max-width: 980px; margin: -16px auto 60px; padding: 0 24px; }
+  .card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+    padding: 24px 28px; margin-bottom: 22px; box-shadow: 0 1px 2px rgba(0,0,0,.04);
+  }
+  h2 { font-size: 20px; margin: 0 0 14px; display: flex; align-items: center; gap: 8px; }
+  h3 { font-size: 15px; margin: 20px 0 8px; color: var(--accent); }
+  p { font-size: 14.5px; color: #334155; }
+  code {
+    background: #f1f5f9; border: 1px solid var(--border); border-radius: 5px;
+    padding: 1px 6px; font-size: 13px; font-family: ui-monospace, Consolas, monospace; color: #1e3a8a;
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; margin-top: 8px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: #f8fafc; color: #475569; font-size: 12.5px; text-transform: uppercase; letter-spacing: .03em; }
+  tr:last-child td { border-bottom: none; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 700px) { .grid2 { grid-template-columns: 1fr; } }
+  .mini-card {
+    background: var(--accent-light); border: 1px solid #bfdbfe; border-radius: 10px; padding: 14px 16px;
+  }
+  .mini-card h4 { margin: 0 0 6px; font-size: 13.5px; color: #1e3a8a; }
+  .mini-card p { margin: 0; font-size: 13px; color: #334155; }
+  ul { margin: 6px 0 0; padding-left: 20px; font-size: 14px; color: #334155; }
+  li { margin-bottom: 3px; }
+  .tag { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; margin-left: 6px; }
+  .tag.live { background: #dcfce7; color: #166534; }
+  .tag.mock { background: #fef3c7; color: #92400e; }
+  .role-table th:first-child, .role-table td:first-child { white-space: nowrap; }
+  .note { background: #fffbeb; border: 1px solid #fde68a; border-radius: 10px; padding: 12px 16px; font-size: 13.5px; color: #78350f; }
+  footer { text-align: center; color: #94a3b8; font-size: 12.5px; padding: 24px 0 50px; }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <h1>🏫 Dashboard Padaye — Application Overview</h1>
+    <p>A role-based school management portal (branded in-app as "Greenwood School Portal") covering admissions,
+       academics, attendance, exams, fees, and communication for eight distinct user roles — built as a React
+       frontend that can run entirely on its own, with or without the real backend online.</p>
+    <div class="pills">
+      <span class="pill">React 19 + React Router 7</span>
+      <span class="pill">Context API state</span>
+      <span class="pill">Local mock-data fallback layer</span>
+      <span class="pill">8 roles</span>
+      <span class="pill">Spring Boot backend (optional for demo)</span>
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <div class="card">
+    <h2>📦 What this is</h2>
+    <p><strong>Dashboard Padaye</strong> is a full school-management UI: user &amp; role administration, class and
+      timetable setup, attendance tracking, homework/notes distribution, exams &amp; question papers (including a
+      "Match the Following" question type with a shuffled variant), results, fee collection, holidays, notices and
+      internal messaging, plus cross-cutting reports.</p>
+    <p>It's designed to talk to a real Spring Boot microservices backend (a sibling <code>backend</code> repo,
+      fronted by a single <code>api-gateway</code>), but every screen also works completely stand-alone — see the
+      mock-data layer below — so the UI can be demoed, developed, or tested with no backend running at all.</p>
+  </div>
+
+  <div class="card">
+    <h2>🧱 Architecture</h2>
+    <div class="grid2">
+      <div class="mini-card">
+        <h4>Frontend</h4>
+        <p>React 19 (Create React App), React Router 7 for routing, two React Contexts as the single source of
+          truth: <code>AuthContext</code> (current user/session, role-scoped people lists) and <code>DataContext</code>
+          (classes, exams, homework, notes, results, fees, notices, holidays).</p>
+      </div>
+      <div class="mini-card">
+        <h4>Backend (optional)</h4>
+        <p>Java Spring Boot microservices behind an API gateway, default base URL
+          <code>http://localhost:8080</code> (override with <code>REACT_APP_API_BASE_URL</code>). Not required to
+          run or demo the app.</p>
+      </div>
+    </div>
+
+    <h3>The mock-data fallback layer</h3>
+    <p>Every read first <em>tries the real API</em>; if that call fails (because the backend isn't running, or any
+      network error), it falls back to a local store instead of showing an empty/broken screen. Every write (create /
+      update / delete) is applied to that local store <em>immediately</em> — so the UI feels instantly responsive —
+      and the real API call is still fired in the background on a best-effort basis, ignored if it fails.</p>
+    <ul>
+      <li><strong>Store:</strong> <code>src/data/mockStore.js</code> — persisted to the browser's
+        <code>localStorage</code> under the key <code>padaye_mock_store_v1</code>.</li>
+      <li><strong>Survives:</strong> page reloads and logout/login as a different role (e.g. a Teacher adds a
+        student, logs out, and the Principal immediately sees that student).</li>
+      <li><strong>Auto-resets:</strong> after 24 hours (TTL), the store reseeds itself from scratch with fresh demo
+        data so leftover test data doesn't accumulate indefinitely.</li>
+      <li><strong>Helpers:</strong> <code>readWithFallback()</code> and <code>writeThroughMock()</code> in
+        <code>src/api/mockFallback.js</code>, used at every data-loading/mutating call site across the app.</li>
+    </ul>
+    <div class="note">This means login itself works offline too — if the real <code>authApi.login</code> call
+      fails, the submitted username/password is checked against a seeded demo <code>users</code> table instead.</div>
+  </div>
+
+  <div class="card">
+    <h2>👥 Roles &amp; what each one can do</h2>
+    <p>The left sidebar's navigation is entirely role-driven (<code>src/components/Layout/Sidebar.jsx</code>) — a
+      user only ever sees the tabs their role is entitled to.</p>
+    <table class="role-table">
+      <thead><tr><th>Role</th><th>Can access</th></tr></thead>
+      <tbody>
+        <tr><td>👑 Principal</td><td>Full visibility: dashboard &amp; analytics, user management, staff, all
+          students, classes, fees &amp; finance, exam management, question papers, attendance, holiday calendar,
+          notices, messages, reports.</td></tr>
+        <tr><td>🎓 Headmaster</td><td>Dashboard, class management, timetable, exams, question papers, attendance,
+          homework, user management, staff &amp; student overview, holidays, notices, reports.</td></tr>
+        <tr><td>👨‍🏫 Teacher</td><td>Dashboard, my classes, timetable, mark attendance, upload notes,
+          assignments/homework, exams, question papers, grade book, holidays, messages.</td></tr>
+        <tr><td>💰 Accountant</td><td>Dashboard, fees &amp; accounts, notices.</td></tr>
+        <tr><td>🧹 Support Staff</td><td>Dashboard, notices, holiday calendar.</td></tr>
+        <tr><td>📚 Student</td><td>Dashboard, timetable, study materials, homework, exam schedule, past papers, my
+          results, my attendance, holiday list, notices.</td></tr>
+        <tr><td>👨‍👩‍👧 Parent</td><td>Dashboard, child's attendance, exam results, homework, fee status, contact
+          teacher, messages, school notices, academic calendar.</td></tr>
+        <tr><td>🌐 Guest</td><td>Public, pre-login: school info, public notices, calendar.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>🗂 Feature highlights</h2>
+    <ul>
+      <li><strong>Exams &amp; Question Papers</strong> — supports 7 question types, including a Match-the-Following
+        type and a shuffled Match-the-Following variant.</li>
+      <li><strong>Attendance</strong> — teachers mark daily attendance per class; principal/headmaster see a
+        school-wide summary and per-class breakdown.</li>
+      <li><strong>Fees</strong> — fee status and collection tracking, with a per-student pay-fee flow.</li>
+      <li><strong>Timetable</strong> — class and teacher timetable views.</li>
+      <li><strong>Communication</strong> — notices board and internal messages, scoped per role.</li>
+      <li><strong>Reports</strong> — attendance, exam results, fee collection, and staff performance reports for
+        school leadership.</li>
+      <li><strong>Registration</strong> — "User Management" screen for creating students, staff, and other
+        accounts.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>🔖 Project &amp; repo info</h2>
+    <table>
+      <tbody>
+        <tr><th>Package name</th><td><code>school-mgmt</code></td></tr>
+        <tr><th>In-app branding</th><td>Greenwood School Portal</td></tr>
+        <tr><th>Repository</th><td><code>github.com/ChittiNana/Dashboard_Padaye</code></td></tr>
+        <tr><th>This feature's branch</th><td><code>feature/ui-mock-data-layer</code></td></tr>
+        <tr><th>Key stack</th><td>React 19.2, React Router 7.18, react-scripts (Create React App) 5.0.1</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+</main>
+<footer>Dashboard Padaye — generated application overview</footer>
+</body>
+</html>
