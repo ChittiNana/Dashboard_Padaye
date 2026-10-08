@@ -1,0 +1,977 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Dashboard Padaye — UI Feature Guide</title>
+<style>
+  :root{
+    --navy:#1e3a5f; --navy-dark:#0f1928; --teal:#2c7a7b; --accent:#3182ce;
+    --bg:#f4f6f9; --card:#ffffff; --border:#dfe4ea; --text:#1a202c; --muted:#6b7280;
+    --ok:#2f855a; --warn:#b7791f; --bad:#c53030; --mock:#9b2c2c;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg); color:var(--text); line-height:1.55; font-size:15px;
+  }
+  a{color:var(--accent); text-decoration:none;}
+  a:hover{text-decoration:underline;}
+  code, .code{
+    font-family:Consolas,Monaco,"Courier New",monospace; background:#eef1f5; color:#9b2c2c;
+    padding:2px 5px; border-radius:4px; font-size:0.86em; word-break:break-word;
+  }
+  pre.code-block{
+    font-family:Consolas,Monaco,"Courier New",monospace; background:#1a202c; color:#e2e8f0;
+    padding:12px 14px; border-radius:8px; overflow-x:auto; font-size:12.5px; margin:8px 0;
+  }
+  h1,h2,h3,h4{font-family:inherit; color:var(--navy-dark); line-height:1.25;}
+  h1{font-size:26px;} h2{font-size:21px; margin-top:0;} h3{font-size:16.5px;} h4{font-size:14px;}
+
+  /* layout: sticky left TOC + content */
+  .page{display:flex; min-height:100vh;}
+  .toc{
+    width:280px; flex:0 0 280px; background:var(--navy-dark); color:#cbd5e0;
+    padding:20px 14px 60px; position:sticky; top:0; align-self:flex-start; height:100vh;
+    overflow-y:auto; font-size:13px;
+  }
+  .toc h3{color:#fff; font-size:13px; text-transform:uppercase; letter-spacing:0.06em; margin:18px 0 6px; opacity:0.65;}
+  .toc h3:first-child{margin-top:0;}
+  .toc a{display:block; color:#cbd5e0; padding:5px 8px; border-radius:6px;}
+  .toc a:hover{background:#223a5e; text-decoration:none; color:#fff;}
+  .toc .sub a{padding-left:20px; font-size:12.3px; color:#9fb2c9;}
+  .toc .logo{display:flex; align-items:center; gap:8px; margin-bottom:14px; color:#fff; font-weight:700; font-size:15px;}
+
+  .content{flex:1; padding:34px 44px 100px; max-width:1180px;}
+  section{margin-bottom:56px; padding-top:4px;}
+  section.role-section{border-top:4px solid var(--accent); padding-top:20px;}
+
+  .badge{display:inline-block; padding:2px 9px; border-radius:999px; font-size:11.5px; font-weight:700; color:#fff;}
+  .badge-real{background:var(--ok);}
+  .badge-mock{background:var(--mock);}
+  .badge-partial{background:var(--warn);}
+  .badge-dead{background:#4a5568;}
+
+  table{width:100%; border-collapse:collapse; margin:12px 0 20px; background:var(--card); font-size:13.6px;}
+  th, td{border:1px solid var(--border); padding:8px 10px; text-align:left; vertical-align:top;}
+  th{background:#eef1f6; font-weight:700; color:var(--navy-dark);}
+  tr:nth-child(even) td{background:#fafbfc;}
+
+  .matrix-table th, .matrix-table td{text-align:center; font-size:12.6px; padding:6px 6px;}
+  .matrix-table td:first-child, .matrix-table th:first-child{text-align:left; font-weight:600;}
+  .yes{color:var(--ok); font-weight:800;}
+  .no{color:#c3c9d1;}
+
+  .card{
+    background:var(--card); border:1px solid var(--border); border-radius:10px;
+    padding:16px 18px; margin-bottom:14px;
+  }
+  .feature{
+    border:1px solid var(--border); border-left:5px solid var(--accent); border-radius:8px;
+    padding:14px 18px; margin:14px 0; background:var(--card);
+  }
+  .feature.mock{border-left-color:var(--mock); background:#fff8f8;}
+  .feature.partial{border-left-color:var(--warn); background:#fffaf0;}
+  .feature h4{margin:0 0 6px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
+  .feature .meta{font-size:12px; color:var(--muted); margin-bottom:8px;}
+  .feature ul{margin:6px 0 6px 18px; padding:0;}
+  .feature li{margin-bottom:3px;}
+  .api-line{font-size:12.5px; color:#2b6cb0; margin-top:6px;}
+
+  .limitation{
+    border:1px solid #f0c0c0; background:#fff5f5; border-radius:8px; padding:14px 18px; margin:14px 0;
+  }
+  .limitation h4{color:var(--mock); margin:0 0 6px;}
+  .limitation .evidence{font-size:12.5px; color:#742a2a; margin-top:8px;}
+
+  .top-banner{
+    background:linear-gradient(135deg, var(--navy-dark), var(--navy)); color:#fff;
+    padding:30px 36px; border-radius:14px; margin-bottom:30px;
+  }
+  .top-banner h1{color:#fff; margin:0 0 8px;}
+  .top-banner p{opacity:0.88; margin:4px 0;}
+  .role-pills{display:flex; gap:8px; flex-wrap:wrap; margin-top:14px;}
+  .role-pill{background:rgba(255,255,255,0.14); padding:5px 12px; border-radius:999px; font-size:12.5px;}
+
+  .anchor-offset{display:block; position:relative; top:-10px;}
+  footer{color:var(--muted); font-size:12px; text-align:center; padding:30px 0 10px;}
+  .note{font-size:12.8px; color:var(--muted); font-style:italic;}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ============================= TOC ============================= -->
+  <nav class="toc">
+    <div class="logo">🏫 Dashboard Padaye</div>
+    <h3>Start Here</h3>
+    <a href="#intro">Introduction</a>
+    <a href="#matrix">Role × Feature Matrix</a>
+
+    <h3>Roles</h3>
+    <a href="#role-principal">Principal</a>
+    <a href="#role-headmaster">Headmaster</a>
+    <a href="#role-teacher">Teacher</a>
+    <a href="#role-accountant">Accountant</a>
+    <a href="#role-support_staff">Support Staff</a>
+    <a href="#role-student">Student</a>
+    <a href="#role-parent">Parent</a>
+    <a href="#role-guest">Guest (pre-login)</a>
+
+    <h3>Shared / Cross-Cutting</h3>
+    <a href="#shared-login">Login</a>
+    <a href="#shared-registration">Registration</a>
+    <a href="#shared-navbar">Navbar</a>
+    <a href="#shared-layout">Layout &amp; Sidebar chrome</a>
+    <a href="#shared-management">Shared "Management" screens</a>
+
+    <h3>Reference</h3>
+    <a href="#limitations">Known Limitations / Mock-only</a>
+    <a href="#api-index">API Module Index</a>
+  </nav>
+
+  <!-- ============================= CONTENT ============================= -->
+  <div class="content">
+
+    <div class="top-banner" id="intro">
+      <h1>Dashboard Padaye — UI Feature Guide</h1>
+      <p>"Dashboard Padaye" is a school management system: a React 19 (Create React App) frontend talking to a
+      Java Spring Boot microservices backend (sibling <code style="background:rgba(255,255,255,0.15);color:#fff;">../backend</code> repo,
+      routed through a single <code style="background:rgba(255,255,255,0.15);color:#fff;">api-gateway</code>).
+      It covers the full lifecycle of running a school: people &amp; roles, classes/timetables, attendance,
+      academics (homework/notes/exams/question papers/results), fees, communication (notices/messages), and
+      cross-service reporting.</p>
+      <p>Almost everything is driven by two React contexts — <code style="background:rgba(255,255,255,0.15);color:#fff;">AuthContext</code>
+      (current user, JWT, role-scoped people directories) and <code style="background:rgba(255,255,255,0.15);color:#fff;">DataContext</code>
+      (domain data: classes/exams/homework/notes/results/fees/announcements/holidays). <strong>What a user sees is governed by their role</strong>,
+      sourced from the first entry of the JWT's <code style="background:rgba(255,255,255,0.15);color:#fff;">roles</code> claim, lower-cased.
+      The left sidebar's <code style="background:rgba(255,255,255,0.15);color:#fff;">navConfig</code> object
+      (in <code style="background:rgba(255,255,255,0.15);color:#fff;">Sidebar.jsx</code>) is the single source of truth for which tabs each role can see.</p>
+      <p>There are <strong>7 UI-reachable roles</strong>: Principal, Headmaster, Teacher, Accountant, Support Staff, Student, Parent —
+      plus a pre-login <strong>Guest</strong> screen. (The backend also defines an <code style="background:rgba(255,255,255,0.15);color:#fff;">IT_MANAGER</code>
+      bootstrap role with no dashboard in this frontend by design — see Known Limitations.)</p>
+      <div class="role-pills">
+        <span class="role-pill">👑 Principal</span>
+        <span class="role-pill">🎓 Headmaster</span>
+        <span class="role-pill">👨‍🏫 Teacher</span>
+        <span class="role-pill">💰 Accountant</span>
+        <span class="role-pill">🧹 Support Staff</span>
+        <span class="role-pill">📚 Student</span>
+        <span class="role-pill">👨‍👩‍👧 Parent</span>
+        <span class="role-pill">🌐 Guest</span>
+      </div>
+    </div>
+
+    <p>
+      <span class="badge badge-real">REAL</span> = wired to a live backend endpoint via an <code>src/api/*.js</code> module &nbsp;·&nbsp;
+      <span class="badge badge-partial">PARTIAL</span> = some functions real, others incomplete/one-way &nbsp;·&nbsp;
+      <span class="badge badge-mock">MOCK</span> = reads <code>src/data/mockData.js</code> directly, or is a non-functional stub &nbsp;·&nbsp;
+      <span class="badge badge-dead">DEAD UI</span> = control renders but has no handler at all
+    </p>
+
+    <!-- ============================= MATRIX ============================= -->
+    <section id="matrix">
+      <h2>Role × Feature Matrix</h2>
+      <p>Columns = sidebar tab families (grouped where multiple roles use the same underlying screen). A ✓ means that role's <code>navConfig</code> entry
+      routes to that feature. See each role's section below for exact tab ids/labels and backing APIs.</p>
+      <table class="matrix-table">
+        <thead>
+          <tr>
+            <th>Feature</th><th>Principal</th><th>Headmaster</th><th>Teacher</th><th>Accountant</th><th>Support Staff</th><th>Student</th><th>Parent</th><th>Guest</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Dashboard (home)</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td class="no">—</td></tr>
+          <tr><td>Analytics</td><td class="yes">✓</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="no">—</td></tr>
+          <tr><td>User Registration</td><td class="yes">✓</td><td class="yes">✓</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="no">—</td></tr>
+          <tr><td>Staff directory</td><td class="yes">✓</td><td class="yes">✓</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="no">—</td></tr>
+          <tr><td>Student directory</td><td class="yes">✓</td><td class="yes">✓</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="no">—</td></tr>
+          <tr><td>Class Management (CRUD)</td><td class="yes">✓</td><td class="yes">✓</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="no">—</td></tr>
+          <tr><td>Fees</td><td class="yes">✓</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td><td class="no">—</td></tr>
+          <tr><td>Exam Management / Exams</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td><td class="no">—</td><td class="no">—</td></tr>
+          <tr><td>Question Papers</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td class="no">—</td><td class="no">—</td><td class="yes">✓ (Past Papers)</td><td class="no">—</td><td class="no">—</td></tr>
+          <tr><td>Attendance (mark/view)</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td><td class="yes">✓</td><td class="no">—</td></tr>
+          <tr><td>Timetable</td><td class="no">—</td><td class="yes">✓</td><td class="yes">✓</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td><td class="no">—</td><td class="no">—</td></tr>
+          <tr><td>Homework</td><td class="no">—</td><td class="yes">✓</td><td class="yes">✓</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td><td class="yes">✓</td><td class="no">—</td></tr>
+          <tr><td>Notes / Study Materials</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td><td class="no">—</td><td class="no">—</td></tr>
+          <tr><td>Grade Book / My Results</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td><td class="yes">✓</td><td class="no">—</td></tr>
+          <tr><td>Holidays / Calendar</td><td class="yes">✓ (edit)</td><td class="yes">✓ (edit)</td><td class="yes">✓ (view)</td><td class="no">—</td><td class="yes">✓ (view)</td><td class="yes">✓ (view)</td><td class="yes">✓ (view)</td><td class="yes">✓ (view)</td></tr>
+          <tr><td>Notices</td><td class="yes">✓ (post)</td><td class="yes">✓ (post)</td><td class="no">—</td><td class="yes">✓ (view)</td><td class="yes">✓ (view)</td><td class="yes">✓ (view)</td><td class="yes">✓ (view)</td><td class="yes">✓ (removed, see limitations)</td></tr>
+          <tr><td>Messages</td><td class="yes">✓ (badge, mock)</td><td class="no">—</td><td class="yes">✓ (badge, mock)</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="yes">✓ (badge, mock)</td><td class="no">—</td></tr>
+          <tr><td>Contact Teacher</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="yes">✓ (mock)</td><td class="no">—</td></tr>
+          <tr><td>Reports</td><td class="yes">✓ (4 types)</td><td class="yes">✓ (3 types)</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="no">—</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ============================================================= -->
+    <!-- PRINCIPAL                                                      -->
+    <!-- ============================================================= -->
+    <section class="role-section" id="role-principal">
+      <h2>👑 Principal</h2>
+      <p>Root component: <code>src/components/Principal/PrincipalDashboard.jsx</code>. Highest-privilege role —
+      full oversight. 14 sidebar items across 4 sections (<code>navConfig.principal</code>).</p>
+
+      <div class="feature">
+        <h4>Dashboard <span class="badge badge-real">REAL</span></h4>
+        <div class="meta">tab id: <code>dashboard</code></div>
+        <p>Stat cards: Total Students (<code>allStudents.length</code>), Total Staff, Classes, Attendance Today
+        (<code>attendanceApi.getSchoolSummary()</code>), Fees Collected (sum of <code>fees[].paidAmount</code>), Upcoming Exams.
+        Panels: Recent Announcements, Staff Overview table, Upcoming Examinations table, Class Strength progress bars.
+        Greeting text still reads <code>schoolInfo.name</code> from mock data (cosmetic only).</p>
+        <div class="api-line">APIs: <code>attendanceApi.getSchoolSummary()</code>; everything else via <code>DataContext</code> (<code>classes</code>, <code>exams</code>, <code>announcements</code>, <code>fees</code>) and <code>AuthContext</code> (<code>allStaff</code>, <code>allStudents</code>, <code>allUsers</code>).</div>
+      </div>
+
+      <div class="feature">
+        <h4>Analytics <span class="badge badge-real">REAL</span></h4>
+        <div class="meta">tab id: <code>analytics</code></div>
+        <p>Pass Rate, Distinction count (90+), Notes Uploaded, Homework Given — computed client-side from <code>useData().results/notes/homework</code>.
+        School Attendance stat card from <code>reportingApi.getAnalytics()</code>. Subject Performance (avg % per subject) and Grade Distribution
+        bar charts, both computed client-side over real <code>results</code>.</p>
+        <div class="api-line">APIs: <code>GET /api/reports/analytics</code> via <code>reportingApi.getAnalytics()</code>.</div>
+      </div>
+
+      <div class="feature">
+        <h4>User Management (Registration) <span class="badge badge-real">REAL</span></h4>
+        <div class="meta">tab id: <code>registration</code> → shared <code>Registration.jsx</code></div>
+        <p>Lists all users (<code>usersApi.listUsers()</code>), search + role filter, stat cards, View→read-only detail modal.
+        Registers new users of any of 8 roles (only basic account fields — see Known Limitations for the explicit code-comment
+        admission that extended profile fields aren't wired up yet). Only Principal/Headmaster/IT Manager can register; only
+        IT Manager can register a new Principal.</p>
+        <div class="api-line">APIs: <code>usersApi.listUsers()</code>, <code>authApi.register()</code> (via <code>registerUser()</code>).</div>
+      </div>
+
+      <div class="feature">
+        <h4>Staff (read-only directory) <span class="badge badge-real">REAL</span></h4>
+        <div class="meta">tab id: <code>staff</code> → local <code>StaffManagement</code></div>
+        <p>Searchable table of all teacher+headmaster staff with role badge, staff code, phone, email. No edit/delete controls — view only.</p>
+        <div class="api-line">APIs: sourced from <code>AuthContext.allStaff</code> (<code>peopleApi.listStaff()</code>).</div>
+      </div>
+
+      <div class="feature">
+        <h4>All Students (read-only directory) <span class="badge badge-real">REAL</span></h4>
+        <div class="meta">tab id: <code>students</code> → local <code>AllStudents</code></div>
+        <p>Searchable + class-filterable table: name, admission no., class, DOB, guardian name/phone. View only.</p>
+        <div class="api-line">APIs: <code>AuthContext.allStudents</code> (<code>peopleApi.listStudents()</code>), <code>DataContext.classes</code>.</div>
+      </div>
+
+      <div class="feature">
+        <h4>Classes <span class="badge badge-real">REAL</span></h4>
+        <div class="meta">tab id: <code>classes</code> → shared <code>ClassManagement.jsx</code></div>
+        <p>Full add/edit form (grade 1–12, section A–F, required class-teacher dropdown). Card grid with Edit and
+        Delete-with-confirm. "Delete" is a <strong>soft deactivate</strong>, not a real DELETE (see Known Limitations).</p>
+        <div class="api-line">APIs: <code>classesApi.listClasses()/createClass()/updateClass()</code>.</div>
+      </div>
+
+      <div class="feature">
+        <h4>Fees &amp; Finance <span class="badge badge-real">REAL</span></h4>
+        <div class="meta">tab id: <code>fees</code> → shared <code>FeeManagement.jsx</code></div>
+        <p>Stat cards (Total Due/Collected/Pending/Unpaid count), status filter. As Principal, <code>canPay=false</code> (only
+        accountant can record payments) but <code>canUpdate=true</code> (can edit totalAmount/dueDate/status). No create, no delete —
+        deliberate financial-record safety.</p>
+        <div class="api-line">APIs: <code>feeApi.listFeeRecords()</code>, <code>feeApi.updateFeeRecord()</code>.</div>
+      </div>
+
+      <div class="feature">
+        <h4>Exam Management <span class="badge badge-real">REAL</span></h4>
+        <div class="meta">tab id: <code>exams</code> → shared <code>ExamManagement.jsx</code></div>
+        <p>Create-only form (subject/class/date/maxMarks). Status filter (all/upcoming/completed, computed client-side vs. today).
+        No edit, no delete.</p>
+        <div class="api-line">APIs: <code>academicsApi.listExams()/createExam()</code>.</div>
+      </div>
+
+      <div class="feature">
+        <h4>Question Papers <span class="badge badge-real">REAL</span></h4>
+        <div class="meta">tab id: <code>question-papers</code> → shared <code>QuestionPaperManagement.jsx</code></div>
+        <p><code>canManage=true</code> for principal — can create (2-step wizard: paper-type picker → sections/questions editor,
+        5 paper types, 7 question types), view, print-preview, and enter/view results for exam-linked papers. Papers cannot be
+        edited once saved (no update endpoint exists).</p>
+        <p>7th question type: <strong>Match the Following (Shuffled)</strong> — same two-column pairing as the plain
+        Match the Following type, but Column B is displayed in a randomized, no-fixed-point order (<code>shuffledOrder</code>,
+        a derangement) so it never lines up straight against Column A. Editor has a "🔀 Shuffle Again" control and shows the
+        auto-computed answer key live; the read-only paper viewer gets a <code>.no-print</code> "Show answer key" toggle that
+        highlights the scrambled mapping without affecting the printed sheet.</p>
+        <div class="api-line">APIs: <code>academicsApi.listQuestionPapers()/createQuestionPaper()</code>, <code>peopleApi.listStudents()</code>, <code>academicsApi.createResult()</code> (via <code>addResult</code>). <code>shuffledOrder</code>/<code>pairs</code> round-trip through the backend's opaque JSON <code>content</code> blob with zero backend changes required.</div>
+      </div>
+
+      <div class="feature">
+        <h4>Attendance <span class="badge badge-real">REAL</span></h4>
+        <div class="meta">tab id: <code>attendance</code> → shared <code>AttendanceManagement.jsx</code></div>
+        <p>Principal gets the read-only <strong>AttendanceOverview</strong> branch: school-wide summary +
+        per-active-class breakdown. (The mark-attendance form is teacher-only — see Teacher section.)</p>
+        <div class="api-line">APIs: <code>attendanceApi.getSchoolSummary()</code>, <code>attendanceApi.getClassAttendance(classId)</code> per class.</div>
+      </div>
+
+      <div class="feature">
+        <h4>Holiday Calendar <span class="badge badge-mock">MOCK — no persistence</span></h4>
+        <div class="meta">tab id: <code>holidays</code> → shared <code>HolidayManagement canEdit</code></div>
+        <p>Add form (date/name/type/description) and Delete-with-confirm — both <strong>local React state only</strong>. See Known Limitations.</p>
+      </div>
+
+      <div class="feature">
+        <h4>Notices <span class="badge badge-real">REAL</span></h4>
+        <div class="meta">tab id: <code>notices</code> (sidebar badge literal <code>'2'</code>, hardcoded — see Known Limitations) → shared <code>NoticeManagement.jsx canPost</code></div>
+        <p>Full CRUD: Post (title/audienceRole from 8 real backend <code>Role</code> values incl. "Everyone")/Edit/Delete-with-confirm.</p>
+        <div class="api-line">APIs: <code>communicationApi.listNotices()/createNotice()/updateNotice()/deleteNotice()</code>.</div>
+      </div>
+
+      <div class="feature mock">
+        <h4>Messages <span class="badge badge-mock">MOCK — pure stub</span></h4>
+        <div class="meta">tab id: <code>messages</code> (sidebar badge literal <code>'3'</code>, hardcoded) → local <code>Messages</code></div>
+        <p>Entirely static placeholder screen: an icon, a heading, one line of body text, and a "+ Compose" button with
+        <strong>no onClick handler at all</strong>. No list, no data, no API — the least-wired feature in the whole app.</p>
+      </div>
+
+      <div class="feature">
+        <h4>Reports <span class="badge badge-real">REAL</span></h4>
+        <div class="meta">tab id: <code>reports</code> → local <code>Reports</code></div>
+        <p>4 generate-on-click report cards: Attendance, Exam Results, Fee Collection, Staff Performance — each opens an
+        inline expanding stat-card result panel with loading/error states.</p>
+        <div class="api-line">APIs: <code>reportingApi.getAttendanceReport()</code>, <code>getExamResultsReport()</code>, <code>getFeeCollectionReport()</code>, <code>getStaffPerformanceReport()</code>.</div>
+      </div>
+    </section>
+
+    <!-- ============================================================= -->
+    <!-- HEADMASTER                                                     -->
+    <!-- ============================================================= -->
+    <section class="role-section" id="role-headmaster">
+      <h2>🎓 Headmaster</h2>
+      <p>Root component: <code>src/components/Headmaster/HeadmasterDashboard.jsx</code>. Academic-oversight role —
+      everything Principal has except Analytics, Staff/Student registration-level control, Fees, and Messages;
+      gains Timetable and Homework instead. 13 sidebar items across 4 sections (<code>navConfig.headmaster</code>).</p>
+
+      <div class="feature">
+        <h4>Dashboard <span class="badge badge-real">REAL</span></h4>
+        <div class="meta">tab id: <code>dashboard</code></div>
+        <p>Stat cards: Classes, Teachers, Students, Upcoming Exams. Panels: Today's Attendance (Marked/Present/Absent),
+        Upcoming Exams table, Class Strength progress bars, Recent Notices.</p>
+        <div class="api-line">APIs: <code>attendanceApi.getSchoolSummary()</code>; rest via <code>DataContext</code>/<code>AuthContext</code>.</div>
+      </div>
+
+      <div class="feature">
+        <h4>Class Management <span class="badge badge-real">REAL</span></h4>
+        <div class="meta">tab id: <code>classes</code> → shared <code>ClassManagement.jsx</code> (identical to Principal's)</div>
+      </div>
+
+      <div class="feature">
+        <h4>Timetable <span class="badge badge-real">REAL</span></h4>
+        <div class="meta">tab id: <code>timetable</code> → local <code>TimetableView</code></div>
+        <p>Class picker dropdown; weekly schedule grouped by day, color-coded by subject.</p>
+        <div class="api-line">APIs: <code>timetableApi.getClassTimetable(classId)</code>.</div>
+      </div>
+
+      <div class="feature">
+        <h4>Exams <span class="badge badge-real">REAL</span></h4>
+        <div class="meta">tab id: <code>exams</code> → shared <code>ExamManagement.jsx</code> (identical to Principal's)</div>
+      </div>
+
+      <div class="feature">
+        <h4>Question Papers <span class="badge badge-real">REAL</span></h4>
+        <div class="meta">tab id: <code>question-papers</code> → shared <code>QuestionPaperManagement.jsx</code> (<code>canManage=true</code> for headmaster)</div>
+      </div>
+
+      <div class="feature">
+        <h4>Attendance <span class="badge badge-real">REAL</span></h4>
+        <div class="meta">tab id: <code>attendance</code> → shared <code>AttendanceManagement.jsx</code> → AttendanceOverview branch (same as Principal)</div>
+      </div>
+
+      <div class="feature">
+        <h4>Homework <span class="badge badge-real">REAL (read-only for this role)</span></h4>
+        <div class="meta">tab id: <code>homework</code> → shared <code>HomeworkManagement.jsx</code></div>
+        <p>Headmaster is not a teacher, so <code>isTeacher</code> is false: sees all homework read-only with a class filter;
+        no create form (that's teacher-only within this same shared component).</p>
+        <div class="api-line">APIs: <code>DataContext.homework</code> (<code>academicsApi.listHomework()</code>).</div>
+      </div>
+
+      <div class="feature">
+        <h4>User Management (Registration) <span class="badge badge-real">REAL</span></h4>
+        <div class="meta">tab id: <code>registration</code> → shared <code>Registration.jsx</code> (identical to Principal's, minus the ability to register a Principal)</div>
+      </div>
+
+      <div class="feature">
+        <h4>Staff Overview <span class="badge badge-real">REAL</span></h4>
+        <div class="meta">tab id: <code>staff</code> → local <code>StaffOverview</code></div>
+        <p>Card grid of teachers (avatar, name, staff code, email, phone) — read-only, no table like Principal's version.</p>
+      </div>
+
+      <div class="feature">
+        <h4>Students <span class="badge badge-real">REAL</span></h4>
+        <div class="meta">tab id: <code>students</code> → local <code>StudentsView</code></div>
+        <p>Simple table: student name/avatar, class, admission number. Read-only.</p>
+      </div>
+
+      <div class="feature">
+        <h4>Holiday Calendar <span class="badge badge-mock">MOCK — no persistence</span></h4>
+        <div class="meta">tab id: <code>holidays</code> → shared <code>HolidayManagement canEdit</code> (identical to Principal's)</div>
+      </div>
+
+      <div class="feature">
+        <h4>Notices <span class="badge badge-real">REAL</span></h4>
+        <div class="meta">tab id: <code>notices</code> (no badge for this role) → shared <code>NoticeManagement.jsx canPost</code></div>
+      </div>
+
+      <div class="feature">
+        <h4>Reports <span class="badge badge-real">REAL</span></h4>
+        <div class="meta">tab id: <code>reports</code> → local <code>Reports</code></div>
+        <p>Only 3 report types (Attendance, Exam Analysis, Staff Performance) — Fee Collection is deliberately excluded
+        since the backend's <code>@PreAuthorize</code> denies HEADMASTER on that endpoint.</p>
+        <div class="api-line">APIs: <code>reportingApi.getAttendanceReport()/getExamResultsReport()/getStaffPerformanceReport()</code>.</div>
+      </div>
+    </section>
+
+    <!-- ============================================================= -->
+    <!-- TEACHER                                                        -->
+    <!-- ============================================================= -->
+    <section class="role-section" id="role-teacher">
+      <h2>👨‍🏫 Teacher</h2>
+      <p>Root component: <code>src/components/Teacher/TeacherDashboard.jsx</code>. The only role that can
+      <em>mark</em> attendance and <em>create</em> notes/homework. 12 sidebar items across 4 sections (<code>navConfig.teacher</code>).
+      Teacher has <strong>no Notices tab at all</strong> (confirmed: grep found zero announcement-related code in this file).</p>
+
+      <div class="feature">
+        <h4>Dashboard <span class="badge badge-partial">PARTIAL</span></h4>
+        <div class="meta">tab id: <code>dashboard</code></div>
+        <p>Stat cards: My Classes, My Students, Notes Uploaded, Assignments Given, Exams Scheduled, and
+        <strong>Unread Messages</strong> (mock-derived — see below). Panels: Today's Schedule (real timetable),
+        My Assignments, My Classes' Exams, Recent Messages (mock).</p>
+        <div class="api-line">APIs: <code>timetableApi.getTeacherTimetable(staffId)</code>; classes/notes/homework/exams via <code>DataContext</code> filtered to the teacher's own class-teacher assignments.</div>
+      </div>
+
+      <div class="feature partial">
+        <h4>My Classes <span class="badge badge-partial">PARTIAL — action buttons are dead</span></h4>
+        <div class="meta">tab id: <code>myclasses</code> → local <code>MyClasses</code></div>
+        <p>Card grid of classes where this teacher is the class teacher, with live student counts. Each card has
+        "Take Attendance" and "View Students" buttons — <strong>neither has an onClick handler</strong>; clicking does nothing.</p>
+        <div class="api-line">Evidence: <code>&lt;button className="btn btn-outline btn-sm"&gt;Take Attendance&lt;/button&gt;</code> / <code>&lt;button className="btn btn-ghost btn-sm"&gt;View Students&lt;/button&gt;</code> — no <code>onClick</code> prop on either.</div>
+      </div>
+
+      <div class="feature">
+        <h4>Timetable <span class="badge badge-real">REAL</span></h4>
+        <div class="meta">tab id: <code>timetable</code> → local <code>TeacherTimetable</code></div>
+        <p>Full weekly schedule grouped by day.</p>
+        <div class="api-line">APIs: <code>timetableApi.getTeacherTimetable(staffId)</code>.</div>
+      </div>
+
+      <div class="feature">
+        <h4>Mark Attendance <span class="badge badge-real">REAL</span></h4>
+        <div class="meta">tab id: <code>attendance</code> → shared <code>AttendanceManagement.jsx</code> → MarkAttendance branch (teacher-only)</div>
+        <p>Select own class, date picker, per-student PRESENT/ABSENT/LATE/EXCUSED radios, "All Present"/"All Absent" bulk buttons, Save.</p>
+        <div class="api-line">APIs: <code>attendanceApi.markAttendance(classId,date,entries)</code>, <code>attendanceApi.getClassAttendance(classId)</code>.</div>
+      </div>
+
+      <div class="feature">
+        <h4>Upload Notes <span class="badge badge-real">REAL</span></h4>
+        <div class="meta">tab id: <code>notes</code> → shared <code>NotesManagement.jsx</code></div>
+        <p><code>isTeacher</code> branch: upload form (title/class/subject/fileUrl); sees only own uploads (<code>uploadedByStaffId</code> filter). No edit/delete.</p>
+        <div class="api-line">APIs: <code>academicsApi.listNotes()/createNote()</code>.</div>
+      </div>
+
+      <div class="feature">
+        <h4>Assignments <span class="badge badge-real">REAL</span></h4>
+        <div class="meta">tab id: <code>homework</code> → shared <code>HomeworkManagement.jsx</code></div>
+        <p><code>isTeacher</code> branch: create form (title/class/subject/dueDate/description); sees only own homework
+        (<code>createdByStaffId</code> filter). No edit/delete.</p>
+        <div class="api-line">APIs: <code>academicsApi.listHomework()/createHomework()</code>.</div>
+      </div>
+
+      <div class="feature">
+        <h4>Exams <span class="badge badge-real">REAL</span></h4>
+        <div class="meta">tab id: <code>exams</code> → local <code>ExamsView</code></div>
+        <p>Table of exams filtered to the teacher's own classes, with upcoming/completed status badge.</p>
+        <div class="api-line">APIs: <code>DataContext.exams</code> (<code>academicsApi.listExams()</code>).</div>
+      </div>
+
+      <div class="feature">
+        <h4>Question Papers <span class="badge badge-real">REAL</span></h4>
+        <div class="meta">tab id: <code>question-papers</code> → shared <code>QuestionPaperManagement.jsx</code> (<code>canManage=true</code> for teacher)</div>
+      </div>
+
+      <div class="feature">
+        <h4>Grade Book <span class="badge badge-real">REAL</span></h4>
+        <div class="meta">tab id: <code>gradebook</code> → local <code>GradeBook</code></div>
+        <p>Read-only marks table (student/subject/exam date/marks/max/%/grade) filtered to results of students in the
+        teacher's own classes. <strong>Confirmed real</strong>, not mock — sourced from <code>useData().results</code>, which
+        loads via <code>RESULTS_VISIBLE_ROLES</code> (includes <code>teacher</code>) → <code>academicsApi.listResults()</code>.</p>
+      </div>
+
+      <div class="feature">
+        <h4>Holidays <span class="badge badge-partial">PARTIAL</span></h4>
+        <div class="meta">tab id: <code>holidays</code> → local <code>HolidayView</code></div>
+        <p>Read-only table from <code>useData().holidays</code> — which itself is mock-seeded/local-state-only at the context level (see Known Limitations).</p>
+      </div>
+
+      <div class="feature mock">
+        <h4>Messages <span class="badge badge-mock">MOCK</span></h4>
+        <div class="meta">tab id: <code>messages</code> (sidebar badge literal <code>'2'</code>, hardcoded) → local <code>MessagesView</code></div>
+        <p>Imports <code>{ users, messages }</code> directly from <code>../../data/mockData</code>. Compose form has a "To" dropdown,
+        Subject, Message fields and a <strong>Send button with no onClick handler at all</strong> — nothing is ever sent or persisted.
+        The Dashboard's "Unread Messages" stat and this screen's list both read the same static mock array.</p>
+        <div class="api-line">Evidence: <code>import { users, messages } from '../../data/mockData';</code> ... <code>&lt;button className="btn btn-primary"&gt;Send&lt;/button&gt;</code> (no handler).</div>
+      </div>
+    </section>
+
+    <!-- ============================================================= -->
+    <!-- ACCOUNTANT / SUPPORT STAFF (StaffPortal.jsx)                   -->
+    <!-- ============================================================= -->
+    <section class="role-section" id="role-accountant">
+      <h2>💰 Accountant</h2>
+      <p>Root component: <code>src/components/Staff/StaffPortal.jsx</code> (shared with Support Staff — role is passed
+      in via <code>currentUser</code>). 3 sidebar items (<code>navConfig.accountant</code>).</p>
+
+      <div class="feature">
+        <h4>Dashboard <span class="badge badge-mock">MOCK stats</span></h4>
+        <div class="meta">tab id: <code>dashboard</code></div>
+        <p>Welcome header, 3–4 stat cards (Total Students/Total Staff/Classes/Staff Code) where the first three are read
+        directly from static <code>schoolInfo</code> mock data, <strong>not live-fetched</strong>. Profile card (own info)
+        and Recent Notices (real) below.</p>
+        <div class="api-line">Evidence: <code>import { schoolInfo } from '../../data/mockData';</code> then <code>schoolInfo.totalStudents</code>/<code>totalStaff</code>/<code>totalClasses</code> used directly as stat values.</div>
+      </div>
+
+      <div class="feature">
+        <h4>Fees &amp; Accounts <span class="badge badge-real">REAL</span></h4>
+        <div class="meta">tab id: <code>fees</code> → shared <code>FeeManagement.jsx</code></div>
+        <p>This is the <strong>only role with <code>canPay=true</code></strong> (backend's "pay" endpoint excludes PRINCIPAL).
+        Can also Edit (<code>canUpdate</code> true for accountant+principal). No create/delete.</p>
+        <div class="api-line">APIs: <code>feeApi.listFeeRecords()/payFee()/updateFeeRecord()</code>.</div>
+      </div>
+
+      <div class="feature">
+        <h4>Notices <span class="badge badge-real">REAL (read-only)</span></h4>
+        <div class="meta">tab id: <code>notices</code> → local <code>NoticesView</code> (NOT the shared <code>NoticeManagement</code> component)</div>
+        <p>Simple read-only card list of all notices. No post/edit/delete affordance regardless of role.</p>
+      </div>
+    </section>
+
+    <section class="role-section" id="role-support_staff">
+      <h2>🧹 Support Staff</h2>
+      <p>Also <code>StaffPortal.jsx</code>, driven by the same <code>currentUser.role</code>. 3 sidebar items (<code>navConfig.support_staff</code>) —
+      the most limited role in the system: Dashboard, Notices, Holidays only. <strong>No Fees tab.</strong>
+      Note: <code>Sidebar.jsx</code> renders this role's avatar with <code>role-teacher</code> styling
+      (<code>avatarRole = ['accountant','support_staff'].includes(role) ? 'teacher' : role</code>) purely cosmetic.</p>
+
+      <div class="feature">
+        <h4>Dashboard <span class="badge badge-mock">MOCK stats</span></h4>
+        <div class="meta">tab id: <code>dashboard</code> — identical component to Accountant's Dashboard above, same mock <code>schoolInfo</code> stat cards.</div>
+      </div>
+
+      <div class="feature">
+        <h4>Notices <span class="badge badge-real">REAL (read-only)</span></h4>
+        <div class="meta">tab id: <code>notices</code> → local <code>NoticesView</code> (same component as Accountant's)</div>
+      </div>
+
+      <div class="feature">
+        <h4>Holiday Calendar <span class="badge badge-mock">MOCK — no persistence</span></h4>
+        <div class="meta">tab id: <code>holidays</code> → local <code>HolidaysView</code> (read-only table from <code>useData().holidays</code>)</div>
+      </div>
+    </section>
+
+    <!-- ============================================================= -->
+    <!-- STUDENT                                                        -->
+    <!-- ============================================================= -->
+    <section class="role-section" id="role-student">
+      <h2>📚 Student</h2>
+      <p>Root component: <code>src/components/Student/StudentDashboard.jsx</code>. 10 sidebar items across 4 sections (<code>navConfig.student</code>).</p>
+
+      <div class="feature">
+        <h4>Dashboard <span class="badge badge-real">REAL</span></h4>
+        <div class="meta">tab id: <code>dashboard</code></div>
+        <p>Stat cards: Attendance %, Assignments, Upcoming Exams, Avg Score. Panels: Today's Schedule, Homework, Upcoming Exams, School Notices.</p>
+        <div class="api-line">APIs: <code>attendanceApi.getStudentAttendance(studentId)</code>, <code>academicsApi.getResultsByStudent(studentId)</code>, <code>timetableApi.getClassTimetable(classId)</code>; homework/exams/announcements via <code>DataContext</code>.</div>
+      </div>
+
+      <div class="feature">
+        <h4>Timetable <span class="badge badge-real">REAL</span></h4>
+        <div class="meta">tab id: <code>timetable</code> → local <code>Timetable</code></div>
+        <p>Day-tab picker, full weekly schedule.</p>
+        <div class="api-line">APIs: <code>timetableApi.getClassTimetable(classId)</code>.</div>
+      </div>
+
+      <div class="feature">
+        <h4>Study Materials <span class="badge badge-real">REAL</span></h4>
+        <div class="meta">tab id: <code>notes</code> → local <code>StudyMaterials</code></div>
+        <p>Subject quick-access cards + filterable notes table with file-open links.</p>
+        <div class="api-line">APIs: <code>DataContext.notes</code> (<code>academicsApi.listNotes()</code>).</div>
+      </div>
+
+      <div class="feature">
+        <h4>Homework <span class="badge badge-real">REAL</span></h4>
+        <div class="meta">tab id: <code>homework</code> → local <code>Homework</code></div>
+        <div class="api-line">APIs: <code>DataContext.homework</code>.</div>
+      </div>
+
+      <div class="feature">
+        <h4>Exam Schedule <span class="badge badge-real">REAL</span></h4>
+        <div class="meta">tab id: <code>exams</code> → local <code>ExamSchedule</code></div>
+        <p>Upcoming/completed/all tab filter, plus a hall-ticket reminder banner on the "upcoming" tab.</p>
+        <div class="api-line">APIs: <code>DataContext.exams</code>.</div>
+      </div>
+
+      <div class="feature">
+        <h4>Past Papers <span class="badge badge-real">REAL</span></h4>
+        <div class="meta">tab id: <code>papers</code> → local <code>PastPapers</code></div>
+        <p>Fetches independently of the shared <code>QuestionPaperManagement</code> component (there is no "question papers"
+        slice in <code>DataContext</code>) — filters to the student's own class and <code>content.status === 'published'</code>.</p>
+        <div class="api-line">APIs: <code>academicsApi.listQuestionPapers()</code> (called directly, client-side filtered).</div>
+      </div>
+
+      <div class="feature">
+        <h4>My Results <span class="badge badge-real">REAL</span></h4>
+        <div class="meta">tab id: <code>results</code> → local <code>Results</code></div>
+        <p>Overall average, A-grade count, exams-appeared stat cards + full results table.</p>
+        <div class="api-line">APIs: <code>academicsApi.getResultsByStudent(studentId)</code>.</div>
+      </div>
+
+      <div class="feature">
+        <h4>My Attendance <span class="badge badge-real">REAL</span></h4>
+        <div class="meta">tab id: <code>attendance</code> → local <code>AttendanceView</code></div>
+        <p>Present/Absent/Late/% stat cards; shows a &lt;75% warning banner about exam debarment risk.</p>
+        <div class="api-line">APIs: <code>attendanceApi.getStudentAttendance(studentId)</code>.</div>
+      </div>
+
+      <div class="feature">
+        <h4>Holiday List <span class="badge badge-mock">MOCK</span></h4>
+        <div class="meta">tab id: <code>holidays</code> → local <code>HolidayList</code></div>
+        <p>Imports <code>holidays</code> directly from <code>mockData.js</code> (bypasses <code>DataContext</code> entirely). Hardcoded
+        cutoff date <code>new Date('2026-08-04')</code> to split past vs. upcoming — now stale (today is well past that date).</p>
+      </div>
+
+      <div class="feature">
+        <h4>Notices <span class="badge badge-real">REAL (read-only)</span></h4>
+        <div class="meta">tab id: <code>notices</code> → local <code>Notices</code></div>
+        <div class="api-line">APIs: <code>DataContext.announcements</code>.</div>
+      </div>
+    </section>
+
+    <!-- ============================================================= -->
+    <!-- PARENT                                                         -->
+    <!-- ============================================================= -->
+    <section class="role-section" id="role-parent">
+      <h2>👨‍👩‍👧 Parent</h2>
+      <p>Root component: <code>src/components/Parent/ParentDashboard.jsx</code>. 9 sidebar items across 4 sections (<code>navConfig.parent</code>).
+      <strong>Design limitation:</strong> every single view does <code>const child = children[0]</code> — if a parent has
+      multiple linked children (via <code>peopleApi.getChildrenForParent</code>), only the first is ever shown anywhere.</p>
+
+      <div class="feature">
+        <h4>Dashboard <span class="badge badge-real">REAL</span></h4>
+        <div class="meta">tab id: <code>dashboard</code></div>
+        <p>Gradient child-profile card (attendance %, pending HW, fee due). Panels: Attendance Overview, Latest Results,
+        Homework Status, School Notices.</p>
+        <div class="api-line">APIs: <code>attendanceApi.getStudentAttendance(child.id)</code>, <code>feeApi.getStatusForStudent(child.id)</code>, <code>academicsApi.getResultsByStudent(child.id)</code>; homework/announcements via <code>DataContext</code>.</div>
+      </div>
+
+      <div class="feature">
+        <h4>Attendance <span class="badge badge-real">REAL</span></h4>
+        <div class="meta">tab id: <code>attendance</code> → local <code>AttendanceView</code></div>
+        <div class="api-line">APIs: <code>attendanceApi.getStudentAttendance(child.id)</code>.</div>
+      </div>
+
+      <div class="feature">
+        <h4>Exam Results <span class="badge badge-real">REAL</span></h4>
+        <div class="meta">tab id: <code>results</code> → local <code>ExamResults</code></div>
+        <p>PARENT is not in <code>RESULTS_VISIBLE_ROLES</code> (backend restricts the school-wide results endpoint to
+        TEACHER/PRINCIPAL/HEADMASTER), so this fetches directly per-student instead.</p>
+        <div class="api-line">APIs: <code>academicsApi.getResultsByStudent(child.id)</code>.</div>
+      </div>
+
+      <div class="feature">
+        <h4>Homework <span class="badge badge-real">REAL</span></h4>
+        <div class="meta">tab id: <code>homework</code> → local <code>HomeworkView</code></div>
+        <div class="api-line">APIs: <code>DataContext.homework</code> filtered by <code>h.classId === child.classId</code>.</div>
+      </div>
+
+      <div class="feature">
+        <h4>Fee Status <span class="badge badge-real">REAL — fully interactive</span></h4>
+        <div class="meta">tab id: <code>fees</code> → local <code>FeeStatus</code></div>
+        <p>Status card (Total/Paid/Pending + badge) and a <strong>working "Pay Now" flow</strong> (amount/method/reference → submit),
+        since PARENT is authorized to call the pay endpoint. The real API returns one current-status record per student
+        (not a per-term history list), so the UI shows a single current record rather than a history table.</p>
+        <div class="api-line">APIs: <code>feeApi.getStatusForStudent(child.id)</code>, <code>feeApi.payFee({ feeRecordId, amount, method, reference })</code>.</div>
+      </div>
+
+      <div class="feature mock">
+        <h4>Contact Teacher <span class="badge badge-mock">MOCK — no send capability</span></h4>
+        <div class="meta">tab id: <code>contact</code> → local <code>ContactTeacher</code></div>
+        <p>Teacher-selection cards + compose form (subject/body). <code>handleSend</code> only sets local <code>sent</code> toast
+        state and clears the form fields — <strong>no API call of any kind</strong>. No messaging endpoint exists anywhere
+        in the backend API surface used by this frontend.</p>
+        <div class="api-line">Evidence: <code>const handleSend = () => { ...; setSent(true); setSubject(''); setBody(''); setSelected(null); setTimeout(...) }</code> — zero network calls.</div>
+      </div>
+
+      <div class="feature mock">
+        <h4>Messages <span class="badge badge-mock">MOCK</span></h4>
+        <div class="meta">tab id: <code>messages</code> (sidebar badge literal <code>'1'</code>, hardcoded) → local <code>MessagesView</code></div>
+        <p>Same pattern as Teacher's: <code>import { users, messages } from '../../data/mockData'</code>, read-only thread
+        list filtered by <code>toId</code>/<code>fromId</code>. No compose UI at all on this screen (compose only exists under Contact Teacher, which is also mock).</p>
+      </div>
+
+      <div class="feature">
+        <h4>School Notices <span class="badge badge-real">REAL (read-only)</span></h4>
+        <div class="meta">tab id: <code>notices</code> → local <code>Notices</code></div>
+      </div>
+
+      <div class="feature partial">
+        <h4>Academic Calendar <span class="badge badge-mock">MOCK</span></h4>
+        <div class="meta">tab id: <code>holidays</code> → local <code>AcademicCalendar</code></div>
+        <p>Imports <code>holidays</code> directly from <code>mockData.js</code>, same hardcoded <code>'2026-08-04'</code> cutoff as
+        Student's Holiday List. (A previously-shown "Upcoming Exams" card on this screen was removed entirely in an earlier
+        cleanup pass — PARENT has no backend access to <code>GET /api/exams</code> at all, so there was no legitimate data source for it.)</p>
+      </div>
+    </section>
+
+    <!-- ============================================================= -->
+    <!-- GUEST                                                          -->
+    <!-- ============================================================= -->
+    <section class="role-section" id="role-guest">
+      <h2>🌐 Guest (pre-login)</h2>
+      <p>Component: <code>src/components/Guest/GuestHome.jsx</code>, rendered directly by <code>App.js</code>
+      <strong>without</strong> the <code>Layout</code>/<code>Sidebar</code>/<code>Navbar</code> chrome at all when there is no
+      logged-in user. See Known Limitations for why <code>navConfig.guest</code> in <code>Sidebar.jsx</code> is effectively dead code.</p>
+
+      <div class="feature">
+        <h4>School Info (internal tab: "about") <span class="badge badge-mock">MOCK</span></h4>
+        <p>Hero banner with school name/affiliation/motto/stats (all from mock <code>schoolInfo</code>), a Contact Information
+        card, and a static "Portal Access Guide" describing only 5 of the 7+ real roles (Principal/Headmaster/Teacher/Student/Parent —
+        omits Accountant, Support Staff, and Guest/IT Manager). "Login to Portal" / "Sign In to Portal" buttons call the
+        <code>onLogin</code> prop to reveal the Login screen.</p>
+      </div>
+
+      <div class="feature">
+        <h4>Holidays (internal tab: "holidays") <span class="badge badge-mock">MOCK</span></h4>
+        <p>Static table of all mock holidays (no upcoming/past split here, unlike Student/Parent's equivalent views).</p>
+      </div>
+    </section>
+
+    <!-- ============================================================= -->
+    <!-- SHARED / CROSS-CUTTING                                         -->
+    <!-- ============================================================= -->
+    <section id="shared-login">
+      <h2>Shared — Login</h2>
+      <p><code>src/components/Auth/Login.jsx</code>. Two-panel layout; right-side form (username/password) calls
+      <code>login()</code> from <code>AuthContext</code> → <code>authApi.login()</code> → <code>POST /api/auth/login</code>.
+      Displays <code>AuthContext</code>'s <code>error</code> state on failure. On success, the JWT's <code>roles[0]</code>
+      (lower-cased) becomes <code>currentUser.role</code>, which drives every role-gating decision described in this document.</p>
+    </section>
+
+    <section id="shared-registration">
+      <h2>Shared — Registration ("User Management")</h2>
+      <p><code>src/components/Auth/Registration.jsx</code>. Reachable only by Principal and Headmaster via the
+      <code>registration</code> tab (plus a backend-only <code>it_manager</code> role referenced in code, which has no
+      sidebar entry or dashboard of its own — see Known Limitations).</p>
+      <table>
+        <tr><th>Capability</th><th>Detail</th></tr>
+        <tr><td>List users</td><td>Search + role filter, stat cards, table with a View action opening a read-only detail modal. <code>usersApi.listUsers()</code>.</td></tr>
+        <tr><td>Register</td><td>Role-picker cards (8 roles, including GUEST — see Known Limitations for the resulting backend-enum mismatch) + basic fields: fullName/username/email/password/confirmPassword. <code>authApi.register()</code> via <code>registerUser()</code>.</td></tr>
+        <tr><td>Role rule</td><td><code>canRegister = ['principal','headmaster','it_manager'].includes(role)</code>; only <code>it_manager</code> may register a new Principal.</td></tr>
+        <tr><td>Edit / Delete</td><td>None — view only beyond the registration form itself.</td></tr>
+      </table>
+      <p class="note">Explicit code-comment admission of incompleteness in this file: "Extended profile fields (subjects, class,
+      roll number, etc.) will be added once the people directory is wired up."</p>
+    </section>
+
+    <section id="shared-navbar">
+      <h2>Shared — Navbar</h2>
+      <p><code>src/components/Layout/Navbar.jsx</code>, rendered inside <code>Layout.jsx</code> for every authenticated role.</p>
+      <table>
+        <tr><th>Element</th><th>Behavior</th></tr>
+        <tr><td>☰ Sidebar toggle</td><td>Collapses/expands the sidebar via <code>onToggleSidebar</code> (local state in <code>Layout.jsx</code>).</td></tr>
+        <tr><td>Page title</td><td>Looked up from a static <code>pageTitles</code> map keyed by <code>activeTab</code> id (defaults to "Dashboard" for unmapped ids).</td></tr>
+        <tr><td>Search box</td><td><span class="badge badge-dead">DEAD UI</span> — a plain <code>&lt;input placeholder="Search…"/&gt;</code> with no state, no handler, no results.</td></tr>
+        <tr><td>🔔 Notification dropdown</td><td><span class="badge badge-real">REAL</span> — toggled by local <code>showNotif</code> state; lists the 5 most recent <code>announcements</code> (real notices from <code>DataContext</code>) with title + date. "Unread" badge dot shows whenever <code>announcements.length &gt; 0</code> (there is no actual read/unread concept on the backend <code>Notice</code> entity). "View all notifications" button just closes the dropdown — no dedicated notifications screen exists.</td></tr>
+        <tr><td>User menu</td><td>Avatar + name + role label; the entire block's <code>onClick</code> is wired straight to <code>logout()</code> — clicking anywhere on it logs the user out immediately (no confirm, no separate menu with other options).</td></tr>
+      </table>
+    </section>
+
+    <section id="shared-layout">
+      <h2>Shared — Layout &amp; Sidebar chrome</h2>
+      <p><code>src/components/Layout/Layout.jsx</code> is a thin wrapper: holds <code>collapsed</code> state, renders
+      <code>Sidebar</code> + (<code>Navbar</code> + <code>&lt;main&gt;{children}&lt;/main&gt;</code>) side by side.</p>
+      <p><code>src/components/Layout/Sidebar.jsx</code> contains the authoritative <code>navConfig</code> object (one entry
+      per role, each a list of sections → items with id/icon/label/optional <code>badge</code>). Clicking an item calls
+      <code>onTabChange(item.id)</code>, which sets <code>App.js</code>'s <code>activeTab</code> state, which the active
+      role's dashboard root component uses to pick a view from its own internal <code>views</code> map. The sidebar footer
+      shows the current user's avatar/name/role and logs out on click (same no-confirm pattern as the Navbar user menu).
+      Note: <code>avatarRole</code> maps <code>accountant</code> and <code>support_staff</code> to the <code>teacher</code>
+      avatar color/style — a purely cosmetic quirk.</p>
+    </section>
+
+    <section id="shared-management">
+      <h2>Shared "Management" screens — field/CRUD summary</h2>
+      <p>These components live in <code>src/components/Management/</code> and are reused across multiple role dashboards
+      (see each role section above for exactly which roles route to which, and with what props/gating).</p>
+      <table>
+        <tr><th>Component</th><th>Fields</th><th>Create</th><th>Edit</th><th>Delete</th><th>Notes</th></tr>
+        <tr><td><code>ClassManagement.jsx</code></td><td>grade (1–12), section (A–F), classTeacherId (required)</td><td>✓</td><td>✓</td><td>Soft only (<code>active:false</code>)</td><td>Card grid; Edit/Delete-with-confirm per card.</td></tr>
+        <tr><td><code>AttendanceManagement.jsx</code></td><td>per-student status (PRESENT/ABSENT/LATE/EXCUSED)</td><td>✓ (teacher mark)</td><td>✓ (re-mark same date)</td><td>—</td><td>Root switches entirely on <code>currentUser.role === 'teacher'</code> → MarkAttendance vs. AttendanceOverview.</td></tr>
+        <tr><td><code>ExamManagement.jsx</code></td><td>subject, class, date, maxMarks</td><td>✓</td><td>—</td><td>—</td><td>Status filter (all/upcoming/completed) computed client-side.</td></tr>
+        <tr><td><code>FeeManagement.jsx</code></td><td>pay: amount/method/reference; edit: totalAmount/dueDate/status</td><td>—</td><td>✓ (accountant+principal)</td><td>—</td><td>No create/delete by design (financial-record safety). "Record Payment" = accountant only.</td></tr>
+        <tr><td><code>HolidayManagement.jsx</code></td><td>date, name, type (National/Festival/Regional), description</td><td>✓ (local state only)</td><td>—</td><td>✓ (local state only)</td><td>Takes a <code>canEdit</code> prop; no backend persistence at all (see Known Limitations).</td></tr>
+        <tr><td><code>HomeworkManagement.jsx</code></td><td>title, class, subject, dueDate, description</td><td>✓ (teacher only)</td><td>—</td><td>—</td><td><code>isTeacher</code> gate: teachers see/create only their own; others see all read-only with class filter.</td></tr>
+        <tr><td><code>NotesManagement.jsx</code></td><td>title, class, subject, fileUrl</td><td>✓ (teacher only)</td><td>—</td><td>—</td><td>Same <code>isTeacher</code> pattern as Homework.</td></tr>
+        <tr><td><code>NoticeManagement.jsx</code></td><td>title, audienceRole (8 options incl. Everyone), body</td><td>✓</td><td>✓</td><td>✓ (with confirm)</td><td>Takes a <code>canPost</code> prop; only Principal/Headmaster actually use it with <code>canPost=true</code> — every other role's "notices" view is a separate local read-only component, not this one.</td></tr>
+        <tr><td><code>QuestionPaperManagement.jsx</code></td><td>type, title, class, subject, maxMarks, sections/questions (7 types)</td><td>✓</td><td>—</td><td>—</td><td>Largest component (1100+ lines). 2-step wizard; print-preview via <code>window.print()</code>; separate Results Entry/Viewer sub-views for exam-linked papers.</td></tr>
+      </table>
+    </section>
+
+    <!-- ============================================================= -->
+    <!-- KNOWN LIMITATIONS                                              -->
+    <!-- ============================================================= -->
+    <section id="limitations">
+      <h2>Known Limitations / Mock-only / Not Backend-Wired</h2>
+      <p>Every item below is backed by direct code evidence (import statements, missing handlers, or absent API functions),
+      not assumption.</p>
+
+      <div class="limitation">
+        <h4>1. Sidebar "unread" badges are hardcoded literals, not real counts</h4>
+        <p>In <code>Sidebar.jsx</code>'s <code>navConfig</code>: Principal's Notices badge is the literal string <code>'2'</code>,
+        Principal's Messages badge is <code>'3'</code>, Teacher's Messages badge is <code>'2'</code>, Parent's Messages badge
+        is <code>'1'</code>. None of these are computed from any data source — they are static strings baked into the
+        navigation config object itself.</p>
+        <div class="evidence">Evidence: <code>{ id: 'messages', icon: '💬', label: 'Messages', badge: '3' }</code> (and similarly for the other three) in <code>Sidebar.jsx</code>.</div>
+      </div>
+
+      <div class="limitation">
+        <h4>2. Messages feature (Principal, Teacher, Parent) has zero backend wiring</h4>
+        <p>No <code>messagesApi.js</code> (or any messaging endpoint) exists anywhere in <code>src/api/</code> — confirmed by
+        listing all 12 files in that directory. Principal's Messages tab is a static placeholder with a dead "+ Compose"
+        button. Teacher's and Parent's <code>MessagesView</code> components both <code>import { users, messages } from
+        '../../data/mockData'</code> and render a read-only thread list from that static array; Teacher's compose form's
+        "Send" button has no <code>onClick</code> at all.</p>
+      </div>
+
+      <div class="limitation">
+        <h4>3. Contact Teacher (Parent) never sends anything</h4>
+        <p><code>ContactTeacher()</code>'s <code>handleSend</code> only toggles a local "sent" toast and clears the form —
+        no <code>fetch</code>/API call of any kind. There is no backend endpoint for teacher-contact messages.</p>
+      </div>
+
+      <div class="limitation">
+        <h4>4. Holidays are never persisted to any backend</h4>
+        <p><code>DataContext.jsx</code>'s <code>holidays</code> state is seeded once from <code>mockData.js</code>'s
+        <code>initialHolidays</code> export, and <code>addHoliday</code>/<code>deleteHoliday</code> only call
+        <code>setHolidays</code> — no <code>holidaysApi.js</code> module exists, and no holiday endpoints appear in any
+        other API module. Principal/Headmaster's "add/delete holiday" UI (<code>HolidayManagement canEdit</code>) therefore
+        appears to work but is lost on refresh/re-login. Separately, Student's <code>HolidayList</code> and Parent's
+        <code>AcademicCalendar</code> bypass <code>DataContext</code> entirely and import <code>holidays</code> directly
+        from <code>mockData.js</code>, both using a hardcoded cutoff <code>new Date('2026-08-04')</code> to compute
+        "upcoming" — now stale.</p>
+      </div>
+
+      <div class="limitation">
+        <h4>5. Dead UI: Teacher's "My Classes" action buttons</h4>
+        <p><code>MyClasses()</code> in <code>TeacherDashboard.jsx</code> renders "Take Attendance" and "View Students"
+        buttons on every class card with no <code>onClick</code> handler on either.</p>
+      </div>
+
+      <div class="limitation">
+        <h4>6. Question papers cannot be edited once saved</h4>
+        <p><code>academicsApi.js</code> exposes only <code>listQuestionPapers()</code> and <code>createQuestionPaper()</code> —
+        no update or delete function exists. <code>QuestionPaperManagement.jsx</code>'s editor only ever POSTs a new paper.</p>
+      </div>
+
+      <div class="limitation">
+        <h4>7. No update/delete for exams, homework, notes, or results anywhere in the app</h4>
+        <p><code>academicsApi.js</code> only has create-functions for each of these (<code>createExam</code>,
+        <code>createHomework</code>, <code>createNote</code>, <code>createResult</code>) alongside their list/get
+        functions — matching the backend's and the project's stated convention of no generic DELETE for low-stakes
+        entities being added "opportunistically" at best, and none having been added yet for these four.</p>
+      </div>
+
+      <div class="limitation">
+        <h4>8. Class "delete" is a soft deactivate, not a real delete</h4>
+        <p><code>classesApi.js</code> has no delete function at all; <code>DataContext.jsx</code>'s <code>deleteClass</code>
+        calls <code>classesApi.updateClass(id, { ..., active:false })</code>.</p>
+      </div>
+
+      <div class="limitation">
+        <h4>9. Fee records can never be created or deleted via the UI (by design)</h4>
+        <p><code>feeApi.js</code> exposes only <code>getStatusForStudent</code>, <code>listFeeRecords</code>, <code>payFee</code>,
+        and <code>updateFeeRecord</code> — no create or delete. This is a deliberate financial-record-safety decision
+        documented in <code>docs/PROJECT_CONTEXT.md</code>: "Never add delete for financial records — hide the affordance
+        in the UI instead, matching what the backend intentionally does not expose."</p>
+      </div>
+
+      <div class="limitation">
+        <h4>10. Guest sidebar navigation (<code>navConfig.guest</code>) is effectively dead code</h4>
+        <p><code>App.js</code>'s <code>AppContent()</code> renders <code>&lt;GuestHome onLogin={...}/&gt;</code> directly
+        with no <code>&lt;Layout&gt;</code>/<code>&lt;Sidebar&gt;</code> wrapper at all whenever there is no logged-in user —
+        so <code>navConfig.guest</code>'s three items (<code>home</code>/<code>notices</code>/<code>calendar</code>) never
+        render in the normal pre-login flow. The only path where <code>Sidebar</code> could render guest nav is if a user
+        is actually authenticated with <code>role === 'guest'</code> (the <code>dashboards.guest</code> branch) — but even
+        then, <code>&lt;GuestHome onLogin={() =&gt; {}} /&gt;</code> is rendered <strong>without</strong> being passed
+        <code>activeTab</code>: <code>GuestHome</code> manages its own fully independent internal tab state
+        (<code>'about'</code>/<code>'holidays'</code>, not matching the sidebar's <code>home</code>/<code>notices</code>/<code>calendar</code>
+        ids at all), so clicking those sidebar items would change <code>Layout</code>'s internal <code>activeTab</code>
+        state but have zero visible effect. Additionally, the backend's <code>Role</code> enum (per
+        <code>docs/PROJECT_CONTEXT.md</code>) has no <code>GUEST</code> value, yet <code>Registration.jsx</code> still
+        offers "Guest" as one of its 8 registerable roles — a frontend/backend mismatch.</p>
+      </div>
+
+      <div class="limitation">
+        <h4>11. Accountant/Support Staff dashboard stat cards use static mock data</h4>
+        <p><code>StaffPortal.jsx</code> imports <code>schoolInfo</code> from <code>mockData.js</code> and uses
+        <code>schoolInfo.totalStudents</code>/<code>totalStaff</code>/<code>totalClasses</code> directly as stat-card
+        values, never fetched live. There is no <code>schoolApi.js</code>/school-info endpoint anywhere in the app;
+        Principal's dashboard greeting text also still reads <code>schoolInfo.name</code> for display purposes only.</p>
+      </div>
+
+      <div class="limitation">
+        <h4>12. Parent portal only ever shows the first linked child</h4>
+        <p>Every view in <code>ParentDashboard.jsx</code> destructures <code>const child = children[0]</code>. If
+        <code>peopleApi.getChildrenForParent</code> returns more than one child, only the first is ever displayed across
+        the dashboard, attendance, results, homework, fees, and contact-teacher screens.</p>
+      </div>
+
+      <div class="limitation">
+        <h4>13. Registration explicitly admits incomplete profile fields</h4>
+        <p>Direct code comment in <code>Registration.jsx</code>: "Extended profile fields (subjects, class, roll number,
+        etc.) will be added once the people directory is wired up." Only basic account fields are collected at registration
+        time — there is no way to set a new student's class or a new teacher's subjects from this screen.</p>
+      </div>
+
+      <div class="limitation">
+        <h4>14. Two backend-supported API functions have no UI anywhere</h4>
+        <p><code>timetableApi.createTimetableSlot()</code> — no screen creates/edits timetable slots; every timetable view
+        in the app (Headmaster's school view, Teacher's own, Student's own) is read-only. <code>attendanceApi.getTeacherToday()</code> —
+        also unused by any component.</p>
+      </div>
+
+      <div class="limitation">
+        <h4>15. IT Manager has no dashboard</h4>
+        <p>The backend's <code>Role</code> enum includes <code>IT_MANAGER</code> (a narrow bootstrap-only role that creates
+        the first Principal account), and <code>Registration.jsx</code> contains an <code>isItManager</code> branch, but
+        there is no <code>navConfig.it_manager</code> entry and no dedicated dashboard component for this role anywhere
+        in the frontend — by design, per <code>docs/PROJECT_CONTEXT.md</code>.</p>
+      </div>
+    </section>
+
+    <!-- ============================================================= -->
+    <!-- API INDEX                                                      -->
+    <!-- ============================================================= -->
+    <section id="api-index">
+      <h2>API Module Index</h2>
+      <p>All 12 modules in <code>src/api/</code>, each calling through the single choke point <code>apiFetch()</code> in
+      <code>client.js</code> (attaches JWT, JSON-encodes bodies, does one silent refresh+retry on 401).</p>
+      <table>
+        <tr><th>Module</th><th>Functions</th></tr>
+        <tr><td><code>authApi.js</code></td><td><code>login()</code>, <code>register()</code>, <code>refresh()</code></td></tr>
+        <tr><td><code>usersApi.js</code></td><td><code>listUsers()</code>, <code>getUser()</code>, <code>updateUser()</code>, <code>deleteUser()</code></td></tr>
+        <tr><td><code>peopleApi.js</code></td><td><code>listStudents()</code>, <code>getStudent()</code>, <code>getMyStudentRecord()</code>, <code>createStudent()</code>, <code>updateStudent()</code>, <code>listStaff()</code>, <code>getStaff()</code>, <code>getMyStaffRecord()</code>, <code>getChildrenForParent()</code></td></tr>
+        <tr><td><code>classesApi.js</code></td><td><code>listClasses()</code>, <code>getClass()</code>, <code>createClass()</code>, <code>updateClass()</code> — no delete</td></tr>
+        <tr><td><code>attendanceApi.js</code></td><td><code>markAttendance()</code>, <code>getStudentAttendance()</code>, <code>getClassAttendance()</code>, <code>getSchoolSummary()</code>, <code>getTeacherToday()</code> (unused)</td></tr>
+        <tr><td><code>academicsApi.js</code></td><td><code>listExams()/createExam()</code>, <code>listHomework()/createHomework()</code>, <code>listNotes()/createNote()</code>, <code>listQuestionPapers()/createQuestionPaper()</code>, <code>listResults()/getResultsByStudent()/createResult()</code> — no update/delete for any of these</td></tr>
+        <tr><td><code>timetableApi.js</code></td><td><code>getClassTimetable()</code>, <code>getTeacherTimetable()</code>, <code>createTimetableSlot()</code> (unused by any UI)</td></tr>
+        <tr><td><code>feeApi.js</code></td><td><code>getStatusForStudent()</code>, <code>listFeeRecords()</code>, <code>payFee()</code>, <code>updateFeeRecord()</code> — no create/delete</td></tr>
+        <tr><td><code>communicationApi.js</code></td><td><code>listNotices()</code>, <code>createNotice()</code>, <code>updateNotice()</code>, <code>deleteNotice()</code> — full CRUD; no messages/contact endpoints anywhere</td></tr>
+        <tr><td><code>reportingApi.js</code></td><td><code>getAttendanceReport()</code>, <code>getExamResultsReport()</code>, <code>getFeeCollectionReport()</code>, <code>getStaffPerformanceReport()</code>, <code>getReportCard()</code>, <code>getAnalytics()</code></td></tr>
+        <tr><td><code>tokenStorage.js</code></td><td><code>getAccessToken()/getRefreshToken()/setTokens()/clearTokens()</code>, <code>decodeToken()</code>, <code>isExpired()</code></td></tr>
+        <tr><td><code>client.js</code></td><td><code>apiFetch()</code> (single fetch choke point), <code>ApiError</code>, <code>AuthError</code> classes</td></tr>
+      </table>
+    </section>
+
+    <footer>
+      Dashboard Padaye — UI Feature Guide. Generated by reading every component/context/api file in this repository directly;
+      no information here is sourced from a task summary without independent code verification.
+    </footer>
+  </div>
+</div>
+</body>
+</html>

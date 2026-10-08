@@ -1046,7 +1046,7 @@ textarea.form-control { resize: vertical; min-height: 90px; }
 
 /* Print styles */
 @media print {
-  .sidebar, .navbar, .page-header button, .btn { display: none !important; }
+  .sidebar, .navbar, .page-header button, .btn, .no-print { display: none !important; }
   .page-content { padding: 0; }
   .qp-paper { border: none; padding: 0; box-shadow: none; }
 }

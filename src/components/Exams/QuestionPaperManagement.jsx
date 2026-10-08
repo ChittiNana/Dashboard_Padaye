@@ -53,6 +53,15 @@ const PAPER_TYPES = [
     allowedTypes: ['MatchFollowing'],
     defaults: { duration: '30 mins', maxMarks: 20 },
   },
+  {
+    value: 'matchShuffled',
+    label: 'Match the Following (Shuffled)',
+    icon: '🔀',
+    desc: 'Enter Column A/B pairs — the paper automatically scrambles Column B so nothing lines up straight across (no 1-a, 2-b, 3-c). A real matching challenge instead of a lookup table.',
+    color: '#ec4899',
+    allowedTypes: ['MatchFollowingShuffled'],
+    defaults: { duration: '30 mins', maxMarks: 20 },
+  },
 ];
 
 const ALL_Q_TYPES = [
@@ -62,6 +71,7 @@ const ALL_Q_TYPES = [
   { value: 'TrueFalse',      label: 'True / False',        desc: 'True or False'      },
   { value: 'FillBlanks',     label: 'Fill in the Blanks',  desc: 'Fill blanks'        },
   { value: 'MatchFollowing', label: 'Match the Following', desc: 'Match two columns'  },
+  { value: 'MatchFollowingShuffled', label: 'Match the Following (Shuffled)', desc: 'Match two columns — Column B order is scrambled' },
 ];
 
 function classLabel(classId, classes) {
@@ -76,6 +86,30 @@ function gradePreview(pct) {
   if (pct >= 60) return 'C';
   if (pct >= 50) return 'D';
   return 'F';
+}
+
+// Returns a permutation of [0..n) where no index maps to itself — used so the
+// shuffled Match-the-Following Column B never lines up straight against Column A.
+function shuffleDerangement(n) {
+  if (n <= 1) return Array.from({ length: n }, (_, i) => i);
+  for (let attempt = 0; attempt < 50; attempt++) {
+    const arr = Array.from({ length: n }, (_, i) => i);
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    if (arr.every((v, i) => v !== i)) return arr;
+  }
+  return Array.from({ length: n }, (_, i) => (i + 1) % n); // guaranteed derangement fallback
+}
+
+// Human-readable answer key for a Match-the-Following (Shuffled) question, e.g. "1→c  2→a  3→d  4→b".
+function matchFollowingShuffledKey(q) {
+  const order = q.shuffledOrder || [];
+  return (q.pairs || []).map((_, i) => {
+    const letterIdx = order.indexOf(i);
+    return `${i + 1}→${letterIdx >= 0 ? String.fromCharCode(97 + letterIdx) : '?'}`;
+  }).join('  ');
 }
 
 // ─── Paper Type Picker ────────────────────────────────────────────────────────
@@ -259,6 +293,7 @@ function PaperViewer({ paper, classes, onBack }) {
   const content = paper.content || {};
   const ptInfo  = PAPER_TYPES.find(t => t.value === (content.paperType || 'complete')) || PAPER_TYPES[0];
   let globalQ   = 0;
+  const [showAnswers, setShowAnswers] = useState(false);
 
   return (
     <div>
@@ -272,7 +307,11 @@ function PaperViewer({ paper, classes, onBack }) {
             Read-only preview
           </p>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div className="no-print" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--text-muted)', cursor: 'pointer' }}>
+            <input type="checkbox" checked={showAnswers} onChange={e => setShowAnswers(e.target.checked)} />
+            Show answer key
+          </label>
           <button className="btn btn-ghost" onClick={onBack}>← Back</button>
           <button className="btn btn-primary" onClick={() => window.print()}>🖨 Print</button>
         </div>
@@ -364,6 +403,44 @@ function PaperViewer({ paper, classes, onBack }) {
                         </div>
                       </div>
                     )}
+
+                    {q.type === 'MatchFollowingShuffled' && q.pairs && (
+                      <div style={{ marginTop: 10 }}>
+                        <table className="match-view-table">
+                          <thead>
+                            <tr>
+                              <th style={{ width: '50%' }}>Column A</th>
+                              <th style={{ width: '50%' }}>Column B</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {q.pairs.map((pair, pi) => {
+                              const order = (q.shuffledOrder && q.shuffledOrder.length === q.pairs.length)
+                                ? q.shuffledOrder : q.pairs.map((_, i) => i);
+                              const rightPair = q.pairs[order[pi]];
+                              const isAnswerRow = showAnswers && order[pi] === pi;
+                              return (
+                                <tr key={pi}>
+                                  <td>{pi + 1}. {pair.left}</td>
+                                  <td style={showAnswers ? { color: isAnswerRow ? undefined : 'var(--primary)', fontWeight: isAnswerRow ? undefined : 600 } : undefined}>
+                                    {String.fromCharCode(97 + pi)}) {rightPair.right}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                        {showAnswers ? (
+                          <div className="no-print" style={{ marginTop: 8, fontSize: 12, color: 'var(--primary)', fontWeight: 600 }}>
+                            Answer key: {matchFollowingShuffledKey(q)}
+                          </div>
+                        ) : (
+                          <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text-muted)' }}>
+                            Answer: __________________________________________
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                   <span className="qp-question-marks">[{q.marks} {q.marks === 1 ? 'mark' : 'marks'}]</span>
                 </div>
@@ -390,9 +467,10 @@ function PaperEditor({ paperType: paperTypeProp, onSave, onBack, classes, exams 
   const defaultQType = ptInfo.allowedTypes?.[0] || 'Short';
 
   const sectionLabel = () => {
-    if (ptValue === 'mcq')   return 'Objective Questions';
-    if (ptValue === 'fill')  return 'Fill in the Blanks';
-    if (ptValue === 'match') return 'Match the Following';
+    if (ptValue === 'mcq')          return 'Objective Questions';
+    if (ptValue === 'fill')         return 'Fill in the Blanks';
+    if (ptValue === 'match')        return 'Match the Following';
+    if (ptValue === 'matchShuffled') return 'Match the Following (Shuffled)';
     return 'Section A';
   };
 
@@ -415,9 +493,10 @@ function PaperEditor({ paperType: paperTypeProp, onSave, onBack, classes, exams 
   const addSection = () => {
     const newId  = (form.sections[form.sections.length - 1]?.id || 0) + 1;
     const letter = String.fromCharCode(64 + form.sections.length + 1);
-    const title  = ptValue === 'mcq'   ? `Section ${letter} – Objective`    :
-                   ptValue === 'fill'  ? `Fill in the Blanks – Part ${letter}` :
-                   ptValue === 'match' ? `Match the Following – Part ${letter}` :
+    const title  = ptValue === 'mcq'          ? `Section ${letter} – Objective`    :
+                   ptValue === 'fill'         ? `Fill in the Blanks – Part ${letter}` :
+                   ptValue === 'match'        ? `Match the Following – Part ${letter}` :
+                   ptValue === 'matchShuffled' ? `Match the Following (Shuffled) – Part ${letter}` :
                    `Section ${letter}`;
     setForm(f => ({ ...f, sections: [...f.sections, { id: newId, title, sectionInstructions: '', questions: [] }] }));
   };
@@ -433,6 +512,13 @@ function PaperEditor({ paperType: paperTypeProp, onSave, onBack, classes, exams 
       newQ = {
         id: newQId, type: 'MatchFollowing', text: 'Match the following:', marks: 5,
         pairs: [{ id: 1, left: '', right: '' }, { id: 2, left: '', right: '' }, { id: 3, left: '', right: '' }, { id: 4, left: '', right: '' }],
+        answer: '',
+      };
+    } else if (defaultQType === 'MatchFollowingShuffled') {
+      const pairs = [{ id: 1, left: '', right: '' }, { id: 2, left: '', right: '' }, { id: 3, left: '', right: '' }, { id: 4, left: '', right: '' }];
+      newQ = {
+        id: newQId, type: 'MatchFollowingShuffled', text: 'Match the following:', marks: 5,
+        pairs, shuffledOrder: shuffleDerangement(pairs.length),
         answer: '',
       };
     } else if (defaultQType === 'MCQ') {
@@ -454,6 +540,10 @@ function PaperEditor({ paperType: paperTypeProp, onSave, onBack, classes, exams 
       if (q.id !== qid) return q;
       if (field === 'type' && val === 'MatchFollowing' && !q.pairs) {
         return { ...q, type: val, pairs: [{ id: 1, left: '', right: '' }, { id: 2, left: '', right: '' }, { id: 3, left: '', right: '' }, { id: 4, left: '', right: '' }] };
+      }
+      if (field === 'type' && val === 'MatchFollowingShuffled') {
+        const pairs = (q.pairs && q.pairs.length) ? q.pairs : [{ id: 1, left: '', right: '' }, { id: 2, left: '', right: '' }, { id: 3, left: '', right: '' }, { id: 4, left: '', right: '' }];
+        return { ...q, type: val, pairs, shuffledOrder: shuffleDerangement(pairs.length) };
       }
       if (field === 'type' && val === 'MCQ' && !q.options) {
         return { ...q, type: val, options: ['', '', '', ''] };
@@ -478,17 +568,32 @@ function PaperEditor({ paperType: paperTypeProp, onSave, onBack, classes, exams 
     const sec    = form.sections.find(s => s.id === sid);
     const q      = sec.questions.find(qq => qq.id === qid);
     const pairId = (q.pairs[q.pairs.length - 1]?.id || 0) + 1;
+    const newPairs = [...q.pairs, { id: pairId, left: '', right: '' }];
     updateSection(sid, 'questions', sec.questions.map(qq =>
-      qq.id === qid ? { ...qq, pairs: [...qq.pairs, { id: pairId, left: '', right: '' }] } : qq
+      qq.id === qid
+        ? { ...qq, pairs: newPairs, ...(qq.type === 'MatchFollowingShuffled' ? { shuffledOrder: shuffleDerangement(newPairs.length) } : {}) }
+        : qq
     ));
   };
 
   const removePair = (sid, qid, pairId) => {
     const sec = form.sections.find(s => s.id === sid);
-    updateSection(sid, 'questions', sec.questions.map(q =>
-      q.id === qid ? { ...q, pairs: q.pairs.filter(p => p.id !== pairId) } : q
+    updateSection(sid, 'questions', sec.questions.map(q => {
+      if (q.id !== qid) return q;
+      const newPairs = q.pairs.filter(p => p.id !== pairId);
+      return { ...q, pairs: newPairs, ...(q.type === 'MatchFollowingShuffled' ? { shuffledOrder: shuffleDerangement(newPairs.length) } : {}) };
+    }));
+  };
+
+  // Re-rolls the Column B scramble for a Match-the-Following (Shuffled) question.
+  const reshufflePairs = (sid, qid) => {
+    const sec = form.sections.find(s => s.id === sid);
+    const q   = sec.questions.find(qq => qq.id === qid);
+    updateSection(sid, 'questions', sec.questions.map(qq =>
+      qq.id === qid ? { ...qq, shuffledOrder: shuffleDerangement(qq.pairs.length) } : qq
     ));
   };
+
 
   const updatePair = (sid, qid, pairId, field, val) => {
     const sec = form.sections.find(s => s.id === sid);
@@ -652,7 +757,7 @@ function PaperEditor({ paperType: paperTypeProp, onSave, onBack, classes, exams 
                 </div>
 
                 {/* ── Match the Following editor ── */}
-                {q.type === 'MatchFollowing' ? (
+                {(q.type === 'MatchFollowing' || q.type === 'MatchFollowingShuffled') ? (
                   <div>
                     <div className="reg-grid-2" style={{ marginBottom: 12 }}>
                       <div className="reg-form-group">
@@ -689,15 +794,31 @@ function PaperEditor({ paperType: paperTypeProp, onSave, onBack, classes, exams 
                           >✕</button>
                         </div>
                       ))}
-                      <button className="btn btn-ghost btn-sm" style={{ marginTop: 6 }} onClick={() => addPair(sec.id, q.id)}>
-                        + Add Pair
-                      </button>
+                      <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+                        <button className="btn btn-ghost btn-sm" onClick={() => addPair(sec.id, q.id)}>
+                          + Add Pair
+                        </button>
+                        {q.type === 'MatchFollowingShuffled' && (
+                          <button className="btn btn-ghost btn-sm" onClick={() => reshufflePairs(sec.id, q.id)}>
+                            🔀 Shuffle Again
+                          </button>
+                        )}
+                      </div>
                     </div>
 
-                    <div className="reg-form-group" style={{ marginTop: 12 }}>
-                      <label className="reg-label">Answer Key (optional, for teacher reference)</label>
-                      <input className="form-control" value={q.answer} onChange={e => updateQuestion(sec.id, q.id, 'answer', e.target.value)} placeholder="e.g. 1-b, 2-a, 3-d, 4-c" />
-                    </div>
+                    {q.type === 'MatchFollowingShuffled' ? (
+                      <div className="reg-form-group" style={{ marginTop: 12 }}>
+                        <label className="reg-label">Answer Key (auto-generated from current scramble)</label>
+                        <div className="form-control" style={{ background: 'var(--bg-app)', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                          {matchFollowingShuffledKey(q)}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="reg-form-group" style={{ marginTop: 12 }}>
+                        <label className="reg-label">Answer Key (optional, for teacher reference)</label>
+                        <input className="form-control" value={q.answer} onChange={e => updateQuestion(sec.id, q.id, 'answer', e.target.value)} placeholder="e.g. 1-b, 2-a, 3-d, 4-c" />
+                      </div>
+                    )}
                   </div>
                 ) : (
                   /* ── All other question types ── */
