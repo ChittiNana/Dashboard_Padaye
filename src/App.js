@@ -39,7 +39,7 @@ function AppContent() {
   const dashboards = {
     principal:    <PrincipalDashboard  activeTab={activeTab} />,
     headmaster:   <HeadmasterDashboard activeTab={activeTab} />,
-    teacher:      <TeacherDashboard    activeTab={activeTab} />,
+    teacher:      <TeacherDashboard    activeTab={activeTab} onTabChange={handleTabChange} />,
     student:      <StudentDashboard    activeTab={activeTab} />,
     parent:       <ParentDashboard     activeTab={activeTab} />,
     accountant:   <StaffPortal         activeTab={activeTab} />,

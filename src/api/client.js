@@ -95,5 +95,18 @@ export async function apiFetch(path, options = {}) {
     clearTokens();
     throw new AuthError(message);
   }
-  throw new ApiError(message, response.status, errorBody);
+  const error = new ApiError(message, response.status, errorBody);
+  // Backend standard error body: { code, retryable, traceId, fieldErrors[] } (backend docs/REST_API_STANDARDS.md).
+  if (errorBody && typeof errorBody === 'object') {
+    error.code = errorBody.code;
+    error.retryable = errorBody.retryable === true;
+    error.traceId = errorBody.traceId || response.headers.get('X-Request-Id');
+    error.fieldErrors = Array.isArray(errorBody.fieldErrors) ? errorBody.fieldErrors : [];
+  }
+  const retryAfter = Number(response.headers.get('Retry-After'));
+  if (retryAfter > 0) error.retryAfterSeconds = retryAfter;
+  if (response.status === 429 && retryAfter > 0) {
+    error.message = `Too many requests. Please try again in ${retryAfter} seconds.`;
+  }
+  throw error;
 }

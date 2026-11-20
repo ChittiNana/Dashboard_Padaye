@@ -3,11 +3,9 @@ import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import * as academicsApi from '../../api/academicsApi';
 import * as peopleApi from '../../api/peopleApi';
-import { schoolInfo } from '../../data/mockData';
-import { readWithFallback, writeThroughMock } from '../../api/mockFallback';
-import { listTable, insertRecord } from '../../data/mockStore';
-
-const SUBJECTS = ['Mathematics', 'Science', 'English', 'Hindi', 'History', 'Geography', 'Computer', 'PE', 'Drawing'];
+import { readWithFallback, writeWithApi } from '../../api/mockFallback';
+import { errorText } from '../../utils/apiError';
+import { listTable, insertRecord, ONLINE_GRADABLE_TYPES } from '../../data/mockStore';
 
 const PAPER_TYPES = [
   {
@@ -174,6 +172,7 @@ function PaperTypePicker({ onSelect, onBack }) {
 
 // ─── Paper List ───────────────────────────────────────────────────────────────
 function PaperList({ papers, classes, onView, onCreate, onCreateResult, currentUser }) {
+  const { subjects } = useData();
   const [search, setSearch]               = useState('');
   const [filterClass, setFilterClass]     = useState('all');
   const [filterSubject, setFilterSubject] = useState('all');
@@ -229,7 +228,7 @@ function PaperList({ papers, classes, onView, onCreate, onCreateResult, currentU
           </select>
           <select className="form-control" style={{ maxWidth: 150 }} value={filterSubject} onChange={e => setFilterSubject(e.target.value)}>
             <option value="all">All Subjects</option>
-            {SUBJECTS.map(s => <option key={s}>{s}</option>)}
+            {subjects.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
           </select>
           <select className="form-control" style={{ maxWidth: 200 }} value={filterType} onChange={e => setFilterType(e.target.value)}>
             <option value="all">All Paper Types</option>
@@ -275,7 +274,7 @@ function PaperList({ papers, classes, onView, onCreate, onCreateResult, currentU
                     <td>
                       <div style={{ display: 'flex', gap: 4 }}>
                         <button className="btn btn-ghost btn-sm" onClick={() => onView(p)}>View</button>
-                        {canManage && statusOf(p) === 'published' && <button className="btn btn-ghost btn-sm" style={{ color: 'var(--success)' }} onClick={() => onCreateResult(p)}>Results</button>}
+                        {currentUser?.role === 'teacher' && statusOf(p) === 'published' && <button className="btn btn-ghost btn-sm" style={{ color: 'var(--success)' }} onClick={() => onCreateResult(p)}>Results</button>}
                       </div>
                     </td>
                   </tr>
@@ -291,6 +290,7 @@ function PaperList({ papers, classes, onView, onCreate, onCreateResult, currentU
 
 // ─── Paper Viewer ─────────────────────────────────────────────────────────────
 function PaperViewer({ paper, classes, onBack }) {
+  const { schoolInfo } = useData();
   const qLabels = ['a', 'b', 'c', 'd'];
   const content = paper.content || {};
   const ptInfo  = PAPER_TYPES.find(t => t.value === (content.paperType || 'complete')) || PAPER_TYPES[0];
@@ -461,12 +461,20 @@ function PaperViewer({ paper, classes, onBack }) {
 
 // ─── Paper Editor ─────────────────────────────────────────────────────────────
 function PaperEditor({ paperType: paperTypeProp, onSave, onBack, classes, exams }) {
+  const { currentUser } = useAuth();
+  const { subjects } = useData();
   const ptValue    = paperTypeProp || 'complete';
   const ptInfo     = PAPER_TYPES.find(p => p.value === ptValue) || PAPER_TYPES[0];
   const allowedQTs = ptInfo.allowedTypes
     ? ALL_Q_TYPES.filter(t => ptInfo.allowedTypes.includes(t.value))
     : ALL_Q_TYPES;
   const defaultQType = ptInfo.allowedTypes?.[0] || 'Short';
+  // Online delivery only makes sense if this paper type can produce at least
+  // one auto-gradable question (plain, unshuffled Match-the-Following can't).
+  const onlineEligible = !ptInfo.allowedTypes || ptInfo.allowedTypes.some(t => ONLINE_GRADABLE_TYPES.includes(t));
+  // A teacher is restricted to their own subject (ties to #16's subject field);
+  // other roles (Principal/Headmaster creating on a teacher's behalf) see the full list.
+  const subjectOptions = (currentUser?.role === 'teacher' && currentUser?.subject) ? [currentUser.subject] : subjects.map(s => s.name);
 
   const sectionLabel = () => {
     if (ptValue === 'mcq')          return 'Objective Questions';
@@ -477,13 +485,14 @@ function PaperEditor({ paperType: paperTypeProp, onSave, onBack, classes, exams 
   };
 
   const [form, setForm] = useState(() => ({
-    title: '', examId: '', classId: '', subject: '', fileUrl: '',
+    title: '', examId: '', classId: '', subject: subjectOptions.length === 1 ? subjectOptions[0] : '', fileUrl: '',
     academicYear: '2026-27',
     maxMarks: ptInfo.defaults?.maxMarks ?? 100,
     duration: ptInfo.defaults?.duration ?? '3 hrs',
     instructions: '',
     status: 'draft',
     paperType: ptValue,
+    deliveryMode: 'worksheet', opensAt: '', closesAt: '',
     sections: [{ id: 1, title: sectionLabel(), sectionInstructions: '', questions: [] }],
   }));
 
@@ -491,6 +500,7 @@ function PaperEditor({ paperType: paperTypeProp, onSave, onBack, classes, exams 
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const sf = (field, val) => setForm(f => ({ ...f, [field]: val }));
+  const typeOptions = form.deliveryMode === 'online' ? allowedQTs.filter(t => ONLINE_GRADABLE_TYPES.includes(t.value)) : allowedQTs;
 
   const addSection = () => {
     const newId  = (form.sections[form.sections.length - 1]?.id || 0) + 1;
@@ -509,24 +519,28 @@ function PaperEditor({ paperType: paperTypeProp, onSave, onBack, classes, exams 
   const addQuestion = (sid) => {
     const sec    = form.sections.find(s => s.id === sid);
     const newQId = (sec.questions[sec.questions.length - 1]?.id || 0) + 1;
+    // Online papers can only hold auto-gradable types — fall back to MCQ if
+    // this paper type's own default (e.g. 'Short' for a Complete paper) isn't one.
+    const effectiveType = (form.deliveryMode === 'online' && !ONLINE_GRADABLE_TYPES.includes(defaultQType))
+      ? 'MCQ' : defaultQType;
     let newQ;
-    if (defaultQType === 'MatchFollowing') {
+    if (effectiveType === 'MatchFollowing') {
       newQ = {
         id: newQId, type: 'MatchFollowing', text: 'Match the following:', marks: 5,
         pairs: [{ id: 1, left: '', right: '' }, { id: 2, left: '', right: '' }, { id: 3, left: '', right: '' }, { id: 4, left: '', right: '' }],
         answer: '',
       };
-    } else if (defaultQType === 'MatchFollowingShuffled') {
+    } else if (effectiveType === 'MatchFollowingShuffled') {
       const pairs = [{ id: 1, left: '', right: '' }, { id: 2, left: '', right: '' }, { id: 3, left: '', right: '' }, { id: 4, left: '', right: '' }];
       newQ = {
         id: newQId, type: 'MatchFollowingShuffled', text: 'Match the following:', marks: 5,
         pairs, shuffledOrder: shuffleDerangement(pairs.length),
         answer: '',
       };
-    } else if (defaultQType === 'MCQ') {
+    } else if (effectiveType === 'MCQ') {
       newQ = { id: newQId, type: 'MCQ', text: '', marks: 1, options: ['', '', '', ''], answer: '' };
     } else {
-      newQ = { id: newQId, type: defaultQType, text: '', marks: 1, answer: '' };
+      newQ = { id: newQId, type: effectiveType, text: '', marks: 1, answer: '' };
     }
     updateSection(sid, 'questions', [...sec.questions, newQ]);
   };
@@ -611,6 +625,7 @@ function PaperEditor({ paperType: paperTypeProp, onSave, onBack, classes, exams 
     if (!form.maxMarks)        e.maxMarks = 'Max marks required';
     if (!form.duration.trim()) e.duration = 'Duration is required';
     if (!form.sections.length) e.sections = 'Add at least one section';
+    if (form.deliveryMode === 'online' && !form.examId) e.examId = 'Online exams must be linked to an Exam so results can be recorded';
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -627,10 +642,15 @@ function PaperEditor({ paperType: paperTypeProp, onSave, onBack, classes, exams 
         title,
         examId: examId ? Number(examId) : null,
         fileUrl: fileUrl || null,
-        content: { ...content, status, maxMarks: Number(form.maxMarks) },
+        // datetime-local values have no zone; store real instants so server and browser zones agree
+        content: {
+          ...content, status, maxMarks: Number(form.maxMarks),
+          opensAt: form.opensAt ? new Date(form.opensAt).toISOString() : null,
+          closesAt: form.closesAt ? new Date(form.closesAt).toISOString() : null,
+        },
       });
     } catch (err) {
-      setSubmitError(err.message || 'Failed to save question paper');
+      setSubmitError(errorText(err, 'Failed to save question paper'));
       setSubmitting(false);
     }
   };
@@ -658,6 +678,13 @@ function PaperEditor({ paperType: paperTypeProp, onSave, onBack, classes, exams 
       </div>
 
       {submitError && <div className="alert alert-danger mb-20">{submitError}</div>}
+      {form.deliveryMode === 'online' && (
+        <div className="alert alert-warning mb-20" style={{ fontSize: 13 }}>
+          Online delivery only supports auto-gradable question types (MCQ, True/False, Fill in the
+          Blanks, Match the Following — Shuffled). Students will take this exam in-browser and
+          results are generated automatically on submission.
+        </div>
+      )}
 
       {/* Paper Information */}
       <div className="card mb-20">
@@ -670,11 +697,14 @@ function PaperEditor({ paperType: paperTypeProp, onSave, onBack, classes, exams 
               {errors.title && <span className="reg-field-error">{errors.title}</span>}
             </div>
             <div className="reg-form-group">
-              <label className="reg-label">Link to Exam (optional)</label>
-              <select className="form-control" value={form.examId} onChange={e => sf('examId', e.target.value)}>
+              <label className={`reg-label${form.deliveryMode === 'online' ? ' required' : ''}`}>
+                Link to Exam {form.deliveryMode === 'online' ? '' : '(optional)'}
+              </label>
+              <select className={`form-control${errors.examId ? ' input-error' : ''}`} value={form.examId} onChange={e => sf('examId', e.target.value)}>
                 <option value="">None</option>
                 {exams.map(ex => <option key={ex.id} value={ex.id}>{ex.subject} — Class {classLabel(ex.classId, classes)} ({ex.examDate})</option>)}
               </select>
+              {errors.examId && <span className="reg-field-error">{errors.examId}</span>}
             </div>
             <div className="reg-form-group">
               <label className="reg-label required">Class</label>
@@ -686,12 +716,45 @@ function PaperEditor({ paperType: paperTypeProp, onSave, onBack, classes, exams 
             </div>
             <div className="reg-form-group">
               <label className="reg-label required">Subject</label>
-              <select className={`form-control${errors.subject ? ' input-error' : ''}`} value={form.subject} onChange={e => sf('subject', e.target.value)}>
-                <option value="">Select subject</option>
-                {SUBJECTS.map(s => <option key={s}>{s}</option>)}
-              </select>
+              {subjectOptions.length === 1 ? (
+                <div className="form-control" style={{ background: 'var(--bg-app)', color: 'var(--text-secondary)', fontWeight: 600 }}>{subjectOptions[0]}</div>
+              ) : (
+                <select className={`form-control${errors.subject ? ' input-error' : ''}`} value={form.subject} onChange={e => sf('subject', e.target.value)}>
+                  <option value="">Select subject</option>
+                  {subjectOptions.map(s => <option key={s}>{s}</option>)}
+                </select>
+              )}
               {errors.subject && <span className="reg-field-error">{errors.subject}</span>}
             </div>
+            <div className="reg-form-group">
+              <label className="reg-label">Delivery Mode</label>
+              <select
+                className="form-control"
+                value={form.deliveryMode}
+                disabled={!onlineEligible}
+                onChange={e => sf('deliveryMode', e.target.value)}
+              >
+                <option value="worksheet">Worksheet (print/PDF)</option>
+                {onlineEligible && <option value="online">Online (students take it in-browser)</option>}
+              </select>
+              {!onlineEligible && (
+                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                  This paper type has no auto-gradable question types, so it can only be a worksheet.
+                </span>
+              )}
+            </div>
+            {form.deliveryMode === 'online' && (
+              <>
+                <div className="reg-form-group">
+                  <label className="reg-label">Opens At</label>
+                  <input type="datetime-local" className="form-control" value={form.opensAt} onChange={e => sf('opensAt', e.target.value)} />
+                </div>
+                <div className="reg-form-group">
+                  <label className="reg-label">Closes At</label>
+                  <input type="datetime-local" className="form-control" value={form.closesAt} onChange={e => sf('closesAt', e.target.value)} />
+                </div>
+              </>
+            )}
             <div className="reg-form-group">
               <label className="reg-label">Academic Year</label>
               <input className="form-control" value={form.academicYear} onChange={e => sf('academicYear', e.target.value)} placeholder="e.g. 2026-27" />
@@ -845,13 +908,13 @@ function PaperEditor({ paperType: paperTypeProp, onSave, onBack, classes, exams 
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                         <div className="reg-form-group">
                           <label className="reg-label required">Type</label>
-                          {allowedQTs.length === 1 ? (
+                          {typeOptions.length === 1 ? (
                             <div className="form-control" style={{ background: 'var(--bg-app)', color: 'var(--text-secondary)', cursor: 'default', fontWeight: 600 }}>
-                              {allowedQTs[0].label}
+                              {typeOptions[0].label}
                             </div>
                           ) : (
                             <select className="form-control" value={q.type} onChange={e => updateQuestion(sec.id, q.id, 'type', e.target.value)}>
-                              {allowedQTs.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                              {typeOptions.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
                             </select>
                           )}
                         </div>
@@ -941,6 +1004,7 @@ function ResultsEntry({ paper, exam, students, existingResults, classes, onSave,
   const [marks, setMarks]   = useState(initMarks);
   const [saved, setSaved]   = useState(false);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
   const setMark = (sid, val) => {
     const n = Number(val);
@@ -952,10 +1016,13 @@ function ResultsEntry({ paper, exam, students, existingResults, classes, onSave,
       .filter(s => marks[s.id] !== '')
       .map(s => ({ studentId: s.id, examId: paper.examId, subject: paper.subject, marksObtained: Number(marks[s.id]), maxMarks }));
     setSaving(true);
+    setSaveError('');
     try {
       await onSave(newResults);
       setSaved(true);
       setTimeout(() => { setSaved(false); onBack(); }, 1200);
+    } catch (err) {
+      setSaveError(errorText(err, 'Failed to save results'));
     } finally {
       setSaving(false);
     }
@@ -988,6 +1055,7 @@ function ResultsEntry({ paper, exam, students, existingResults, classes, onSave,
         </div>
       </div>
 
+      {saveError && <div className="alert alert-danger mb-20">{saveError}</div>}
       {saved && <div className="alert-success mb-20"><span>✅</span> Results saved successfully!</div>}
 
       <div className="card">
@@ -1132,12 +1200,16 @@ export default function QuestionPaperManagement({ defaultView = 'list' }) {
   const canManage = ['principal', 'headmaster', 'teacher'].includes(currentUser?.role);
 
   const loadPapers = useCallback(async () => {
-    setPapers(await readWithFallback(
-      () => academicsApi.listQuestionPapers(),
-      () => listTable('questionPapers'),
-      { label: 'listQuestionPapers' },
-    ));
-    setPapersError('');
+    try {
+      setPapers(await readWithFallback(
+        () => academicsApi.listQuestionPapers(),
+        () => listTable('questionPapers'),
+        { label: 'listQuestionPapers' },
+      ));
+      setPapersError('');
+    } catch (err) {
+      setPapersError(errorText(err, 'Failed to load question papers'));
+    }
   }, []);
 
   useEffect(() => { loadPapers(); }, [loadPapers]);
@@ -1151,16 +1223,13 @@ export default function QuestionPaperManagement({ defaultView = 'list' }) {
     ).then(setStudents);
   }, [canManage]);
 
-  const handleSavePaper = (paperData) => {
-    writeThroughMock(
-      () => {
-        const created = insertRecord('questionPapers', paperData);
-        setPapers(prev => [...prev, created]);
-        return created;
-      },
+  const handleSavePaper = async (paperData) => {
+    const { result } = await writeWithApi(
       () => academicsApi.createQuestionPaper(paperData),
+      () => insertRecord('questionPapers', paperData),
       { label: 'createQuestionPaper' },
     );
+    setPapers(prev => [...prev, result]);
     setView('list');
     setNewPaperType(null);
   };

@@ -2,10 +2,9 @@ import { useState } from 'react';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 
-const BLANK = { title: '', audienceRole: '', body: '' };
+const BLANK = { title: '', audienceRoles: [], body: '' };
 
 const AUDIENCE_OPTIONS = [
-  { value: '', label: 'Everyone' },
   { value: 'STUDENT', label: 'Student' },
   { value: 'PARENT', label: 'Parent' },
   { value: 'TEACHER', label: 'Teacher' },
@@ -15,8 +14,17 @@ const AUDIENCE_OPTIONS = [
   { value: 'SUPPORT_STAFF', label: 'Support Staff' },
 ];
 
-function audienceLabel(role) {
-  return AUDIENCE_OPTIONS.find(o => o.value === role)?.label || role || 'Everyone';
+// Back-compat: an older/real-backend notice may still carry a single `audienceRole`
+// instead of the new `audienceRoles` array — normalize both shapes to an array.
+function rolesOf(a) {
+  if (Array.isArray(a.audienceRoles)) return a.audienceRoles;
+  return a.audienceRole ? [a.audienceRole] : [];
+}
+
+function audienceLabel(a) {
+  const roles = rolesOf(a);
+  if (roles.length === 0) return 'Everyone';
+  return roles.map(r => AUDIENCE_OPTIONS.find(o => o.value === r)?.label || r).join(', ');
 }
 
 function formatDate(iso) {
@@ -33,16 +41,26 @@ export default function NoticeManagement({ canPost = false }) {
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [submitting,    setSubmitting]    = useState(false);
   const [submitError,   setSubmitError]   = useState('');
+  const [deleteError,   setDeleteError]   = useState('');
 
   const set   = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const reset = () => { setForm(BLANK); setEditId(null); setShowForm(false); setSubmitError(''); };
 
   const openEdit = (a) => {
-    setForm({ title: a.title, audienceRole: a.audienceRole || '', body: a.body });
+    setForm({ title: a.title, audienceRoles: rolesOf(a), body: a.body });
     setEditId(a.id);
     setShowForm(true);
     setSubmitError('');
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const toggleRole = (role) => {
+    setForm(f => ({
+      ...f,
+      audienceRoles: f.audienceRoles.includes(role)
+        ? f.audienceRoles.filter(r => r !== role)
+        : [...f.audienceRoles, role],
+    }));
   };
 
   const submit = async () => {
@@ -50,7 +68,7 @@ export default function NoticeManagement({ canPost = false }) {
     setSubmitting(true);
     setSubmitError('');
     try {
-      const data = { title: form.title, body: form.body, audienceRole: form.audienceRole || null };
+      const data = { title: form.title, body: form.body, audienceRoles: form.audienceRoles };
       if (editId) { await updateAnnouncement(editId, data); } else { await addAnnouncement(data); }
       reset();
     } catch (err) {
@@ -61,8 +79,11 @@ export default function NoticeManagement({ canPost = false }) {
   };
 
   const confirmDelete = async (id) => {
+    setDeleteError('');
     try {
       await deleteAnnouncement(id);
+    } catch (err) {
+      setDeleteError(err.message || 'Failed to delete notice.');
     } finally {
       setDeleteConfirm(null);
     }
@@ -84,6 +105,8 @@ export default function NoticeManagement({ canPost = false }) {
         )}
       </div>
 
+      {deleteError && <div className="alert alert-danger mb-12">{deleteError}</div>}
+
       {showForm && canPost && (
         <div className="card mb-20">
           <div className="card-header">
@@ -92,21 +115,26 @@ export default function NoticeManagement({ canPost = false }) {
           </div>
           <div className="card-body">
             {submitError && <div className="alert alert-danger mb-8" style={{ fontSize: 12 }}>{submitError}</div>}
-            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16 }}>
-              <div className="form-group">
-                <label className="form-label">Title *</label>
-                <input className="form-control" value={form.title} onChange={e => set('title', e.target.value)} placeholder="Notice title" />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Audience</label>
-                <select className="form-control" value={form.audienceRole} onChange={e => set('audienceRole', e.target.value)}>
-                  {AUDIENCE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                </select>
+            <div className="form-group">
+              <label className="form-label">Title *</label>
+              <input className="form-control" maxLength={255} value={form.title} onChange={e => set('title', e.target.value)} placeholder="Notice title" />
+            </div>
+            <div className="form-group">
+              <label className="form-label">
+                Audience — leave all unchecked to send to everyone, or pick any combination of roles
+              </label>
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                {AUDIENCE_OPTIONS.map(o => (
+                  <label key={o.value} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={form.audienceRoles.includes(o.value)} onChange={() => toggleRole(o.value)} />
+                    {o.label}
+                  </label>
+                ))}
               </div>
             </div>
             <div className="form-group">
               <label className="form-label">Message *</label>
-              <textarea className="form-control" rows={4} value={form.body} onChange={e => set('body', e.target.value)} placeholder="Notice content…" />
+              <textarea className="form-control" rows={4} maxLength={20000} value={form.body} onChange={e => set('body', e.target.value)} placeholder="Notice content…" />
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button className="btn btn-primary" onClick={submit} disabled={submitting}>
@@ -127,7 +155,7 @@ export default function NoticeManagement({ canPost = false }) {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                     <span style={{ fontSize: 16 }}>📢</span>
                     <span style={{ fontWeight: 600, fontSize: 14 }}>{a.title}</span>
-                    <span className="badge badge-gray">{audienceLabel(a.audienceRole)}</span>
+                    <span className="badge badge-gray">{audienceLabel(a)}</span>
                   </div>
                   <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 8 }}>{a.body}</p>
                   <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Posted by {postedByName(a)} · {formatDate(a.createdAt)}</div>

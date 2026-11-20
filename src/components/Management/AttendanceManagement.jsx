@@ -2,8 +2,10 @@ import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import * as attendanceApi from '../../api/attendanceApi';
-import { readWithFallback, writeThroughMock } from '../../api/mockFallback';
+import { readWithFallback, writeWithApi } from '../../api/mockFallback';
 import { deriveClassAttendance, deriveSchoolAttendanceSummary, applyMarkAttendance } from '../../data/mockStore';
+import ProfileAvatar from '../Shared/ProfileAvatar';
+import { errorText } from '../../utils/apiError';
 
 const STATUSES = ['PRESENT', 'ABSENT', 'LATE', 'EXCUSED'];
 
@@ -12,12 +14,12 @@ function today() {
 }
 
 /* ── Teacher: mark attendance ──────────────────────────────────────────── */
-function MarkAttendance() {
+function MarkAttendance({ initialClassId }) {
   const { classes } = useData();
   const { currentUser, allStudents } = useAuth();
   const myClasses = classes.filter(c => c.classTeacherStaffId === currentUser.staffId && c.active !== false);
 
-  const [selectedClass, setSelectedClass] = useState(myClasses[0]?.id ?? '');
+  const [selectedClass, setSelectedClass] = useState(initialClassId ?? myClasses[0]?.id ?? '');
   const [date,           setDate]          = useState(today());
   const [attState,       setAttState]      = useState({});
   const [loading,        setLoading]       = useState(false);
@@ -54,18 +56,23 @@ function MarkAttendance() {
     setSaved(false);
   };
 
-  const save = () => {
+  const save = async () => {
     if (!selectedClass || !date) return;
     setSaving(true);
     setSaveError('');
     const entries = classStudents.map(s => ({ studentId: s.id, status: attState[s.id] || 'PRESENT' }));
-    writeThroughMock(
-      () => applyMarkAttendance(Number(selectedClass), date, entries),
-      () => attendanceApi.markAttendance(Number(selectedClass), date, entries),
-      { label: 'markAttendance' },
-    );
-    setSaved(true);
-    setSaving(false);
+    try {
+      await writeWithApi(
+        () => attendanceApi.markAttendance(Number(selectedClass), date, entries),
+        () => applyMarkAttendance(Number(selectedClass), date, entries),
+        { label: 'markAttendance' },
+      );
+      setSaved(true);
+    } catch (err) {
+      setSaveError(errorText(err, 'Failed to save attendance'));
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -115,7 +122,7 @@ function MarkAttendance() {
                   <tr key={s.id}>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span className="avatar avatar-sm role-student">{s.avatar}</span>
+                        <ProfileAvatar image={s.profileImage} gender={s.gender} role="student" size={28} />
                         {s.name}
                       </div>
                     </td>
@@ -227,8 +234,8 @@ function AttendanceOverview() {
   );
 }
 
-export default function AttendanceManagement() {
+export default function AttendanceManagement({ initialClassId }) {
   const { currentUser } = useAuth();
   const isTeacher = currentUser?.role === 'teacher';
-  return isTeacher ? <MarkAttendance /> : <AttendanceOverview />;
+  return isTeacher ? <MarkAttendance initialClassId={initialClassId} /> : <AttendanceOverview />;
 }

@@ -1,12 +1,23 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { schoolInfo } from '../../data/mockData';
+import { useData } from '../../context/DataContext';
+import { listTable } from '../../data/mockStore';
+import ProfileAvatar from '../Shared/ProfileAvatar';
 
 export default function Login() {
   const { login, error } = useAuth();
+  const { schoolInfo } = useData();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading]   = useState(false);
+
+  // Pure cosmetic preview, mock-only by design — looked up locally as the
+  // person types, before any authentication happens.
+  const matchedUser = useMemo(() => {
+    const typed = username.trim().toLowerCase();
+    if (!typed) return null;
+    return listTable('users').find(u => (u.username || '').toLowerCase() === typed) || null;
+  }, [username]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -27,14 +38,17 @@ export default function Login() {
         </div>
         <div className="login-stats">
           <div className="login-stat">
+            <div className="login-stat-icon">👩‍🎓</div>
             <div className="login-stat-val">{schoolInfo.totalStudents.toLocaleString()}</div>
             <div className="login-stat-lbl">Students</div>
           </div>
           <div className="login-stat">
+            <div className="login-stat-icon">👔</div>
             <div className="login-stat-val">{schoolInfo.totalStaff}</div>
             <div className="login-stat-lbl">Staff</div>
           </div>
           <div className="login-stat">
+            <div className="login-stat-icon">🏫</div>
             <div className="login-stat-val">{schoolInfo.totalClasses}</div>
             <div className="login-stat-lbl">Classes</div>
           </div>
@@ -48,6 +62,13 @@ export default function Login() {
           <div className="login-sub">Sign in to your {schoolInfo.name} portal</div>
 
           {error && <div className="login-error">⚠ {error}</div>}
+
+          {matchedUser && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+              <ProfileAvatar image={matchedUser.profileImage} gender={matchedUser.gender} role={matchedUser.role} size={44} />
+              <div style={{ fontSize: 13, fontWeight: 600 }}>{matchedUser.name}</div>
+            </div>
+          )}
 
           <form onSubmit={handleSubmit}>
             <div className="form-group">

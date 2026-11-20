@@ -8,6 +8,7 @@ import QuestionPaperManagement  from '../Exams/QuestionPaperManagement';
 import AttendanceManagement     from '../Management/AttendanceManagement';
 import HomeworkManagement       from '../Management/HomeworkManagement';
 import NotesManagement          from '../Management/NotesManagement';
+import EventCalendar            from '../Shared/EventCalendar';
 
 const DAY_ORDER = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
 
@@ -55,7 +56,7 @@ function Dashboard({ teacher }) {
 
   useEffect(() => {
     let active = true;
-    if (!teacher.staffId) { setSlotsLoading(false); return; }
+    if (teacher.staffId == null) { setSlotsLoading(false); return; }
     readWithFallback(
       () => timetableApi.getTeacherTimetable(teacher.staffId),
       () => deriveTeacherTimetable(teacher.staffId),
@@ -78,7 +79,10 @@ function Dashboard({ teacher }) {
       <div className="page-header">
         <div className="page-header-left">
           <h1>Welcome, {teacher.name} 👋</h1>
-          <p>Classes: {myClassIds.length ? myClassIds.map(id => classLabel(id, classes)).join(', ') : '—'}</p>
+          <p>
+            Classes: {myClassIds.length ? myClassIds.map(id => classLabel(id, classes)).join(', ') : '—'}
+            {teacher.subject && <> · Subject: {teacher.subject}</>}
+          </p>
         </div>
         <span className="badge badge-info">Teacher Portal</span>
       </div>
@@ -170,14 +174,18 @@ function Dashboard({ teacher }) {
           </div>
           <div className="card-body" style={{ padding: 0 }}>
             {messages.filter(m => m.toId === teacher.id || m.fromId === teacher.id).map(m => {
-              const sender = directoryUsers.find(u => u.id === m.fromId);
+              const isSent = m.fromId === teacher.id;
+              const other = directoryUsers.find(u => u.id === (isSent ? m.toId : m.fromId));
               return (
-                <div key={m.id} style={{ padding:'10px 20px', borderBottom:'1px solid var(--border)' }}>
+                <div key={m.id} style={{ padding:'10px 20px', borderBottom:'1px solid var(--border)', borderLeft: isSent ? 'none' : '3px solid var(--secondary)', borderRight: isSent ? '3px solid #2b6cb0' : 'none', background: isSent ? '#ebf8ff' : 'transparent' }}>
                   <div style={{ display:'flex', gap: 8, alignItems:'flex-start' }}>
-                    <span className={`avatar avatar-sm role-${sender?.role}`}>{sender?.avatar}</span>
+                    <span className={`avatar avatar-sm role-${other?.role}`}>{other?.avatar}</span>
                     <div>
-                      <div style={{ fontWeight: m.read ? 400 : 600, fontSize: 13 }}>{m.subject}</div>
-                      <div style={{ fontSize: 11, color:'var(--text-muted)' }}>{sender?.name} · {m.date}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: m.read ? 400 : 600, fontSize: 13 }}>
+                        <span className={`badge ${isSent ? 'badge-info' : 'badge-success'}`} style={{ fontSize: 9 }}>{isSent ? 'Sent' : 'Received'}</span>
+                        {m.subject}
+                      </div>
+                      <div style={{ fontSize: 11, color:'var(--text-muted)' }}>{other?.name} · {m.date}</div>
                     </div>
                   </div>
                 </div>
@@ -191,10 +199,48 @@ function Dashboard({ teacher }) {
 }
 
 /* ── My Classes ─────────────────────────────────────────────── */
-function MyClasses({ teacher }) {
+function RosterModal({ cls, students, onClose }) {
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-box" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <div className="card-title">Class {cls.gradeLevel}{cls.section} — Students</div>
+          <button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button>
+        </div>
+        <div className="modal-body" style={{ padding: 0 }}>
+          <div className="table-wrapper">
+            <table>
+              <thead><tr><th>Student</th><th>Admission No</th><th>Guardian</th><th>Guardian Phone</th></tr></thead>
+              <tbody>
+                {students.map(s => (
+                  <tr key={s.id}>
+                    <td>
+                      <div style={{ display:'flex', alignItems:'center', gap: 8 }}>
+                        <span className="avatar avatar-sm role-student">{s.avatar}</span>{s.name}
+                      </div>
+                    </td>
+                    <td>{s.admissionNumber || '—'}</td>
+                    <td>{s.guardianName || '—'}</td>
+                    <td>{s.guardianPhone || '—'}</td>
+                  </tr>
+                ))}
+                {students.length === 0 && (
+                  <tr><td colSpan={4} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 24 }}>No students found for this class.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MyClasses({ teacher, onTabChange }) {
   const { classes } = useData();
-  const { allUsers } = useAuth();
+  const { allUsers, allStudents } = useAuth();
   const myClasses = classes.filter(c => c.classTeacherStaffId === teacher.staffId);
+  const [rosterClass, setRosterClass] = useState(null);
 
   return (
     <div>
@@ -222,8 +268,8 @@ function MyClasses({ teacher }) {
                   </div>
                 </div>
                 <div style={{ display:'flex', gap: 8 }}>
-                  <button className="btn btn-outline btn-sm" style={{ flex: 1 }}>Take Attendance</button>
-                  <button className="btn btn-ghost btn-sm" style={{ flex: 1 }}>View Students</button>
+                  <button className="btn btn-outline btn-sm" style={{ flex: 1 }} onClick={() => onTabChange('attendance', cls.id)}>Take Attendance</button>
+                  <button className="btn btn-ghost btn-sm" style={{ flex: 1 }} onClick={() => setRosterClass(cls)}>View Students</button>
                 </div>
               </div>
             </div>
@@ -235,6 +281,13 @@ function MyClasses({ teacher }) {
           </div></div>
         )}
       </div>
+      {rosterClass && (
+        <RosterModal
+          cls={rosterClass}
+          students={allStudents.filter(s => s.classId === rosterClass.id)}
+          onClose={() => setRosterClass(null)}
+        />
+      )}
     </div>
   );
 }
@@ -313,6 +366,7 @@ function HolidayView() {
   return (
     <div>
       <div className="page-header"><div className="page-header-left"><h1>Holiday Calendar 2026-27</h1></div></div>
+      <EventCalendar events={holidays} title="Calendar" />
       <div className="card">
         <div className="table-wrapper">
           <table>
@@ -346,7 +400,7 @@ function TeacherTimetable({ teacher }) {
 
   useEffect(() => {
     let active = true;
-    if (!teacher.staffId) { setLoading(false); return; }
+    if (teacher.staffId == null) { setLoading(false); return; }
     readWithFallback(
       () => timetableApi.getTeacherTimetable(teacher.staffId),
       () => deriveTeacherTimetable(teacher.staffId),
@@ -428,6 +482,43 @@ function ExamsView({ teacher }) {
 }
 
 /* ── Messages ──────────────────────────────────────────────── */
+function MessageRow({ m, other, isSent, expanded, onToggle }) {
+  const preview = m.body.length > 100 ? `${m.body.substring(0, 100)}…` : m.body;
+  return (
+    <div
+      onClick={onToggle}
+      style={{
+        display: 'flex', gap: 10, alignItems: 'flex-start', cursor: 'pointer',
+        padding: '14px 20px', borderBottom: '1px solid var(--border)',
+        flexDirection: isSent ? 'row-reverse' : 'row',
+        background: isSent ? '#ebf8ff' : 'transparent',
+        borderLeft: isSent ? 'none' : '3px solid var(--secondary)',
+        borderRight: isSent ? '3px solid #2b6cb0' : 'none',
+      }}
+    >
+      <span className={`avatar avatar-sm role-${other?.role}`}>{other?.avatar}</span>
+      <div style={{ flex: 1, textAlign: isSent ? 'right' : 'left' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', flexDirection: isSent ? 'row-reverse' : 'row', marginBottom: 2 }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: m.read || isSent ? 400 : 700, fontSize: 13 }}>
+            <span className={`badge ${isSent ? 'badge-info' : 'badge-success'}`} style={{ fontSize: 10 }}>
+              {isSent ? 'Sent' : 'Received'}
+            </span>
+            {other?.name}
+          </span>
+          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{m.date}</span>
+        </div>
+        <div style={{ fontWeight: m.read || isSent ? 400 : 600, fontSize: 13, marginBottom: 4 }}>{m.subject}</div>
+        <div style={{ fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'pre-wrap' }}>
+          {expanded ? m.body : preview}
+        </div>
+        {m.body.length > 100 && (
+          <div style={{ fontSize: 11, color: 'var(--secondary)', marginTop: 4 }}>{expanded ? 'Show less' : 'Click to read full message'}</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function MessagesView({ teacher }) {
   const { messages, directoryUsers, addMessage } = useData();
   const recipients = directoryUsers.filter(u => ['parent', 'headmaster', 'principal'].includes(u.role));
@@ -436,6 +527,7 @@ function MessagesView({ teacher }) {
   const [toId,    setToId]    = useState('');
   const [subject, setSubject] = useState('');
   const [body,    setBody]    = useState('');
+  const [expandedId, setExpandedId] = useState(null);
 
   const myMessages = messages.filter(m => m.toId === teacher.id || m.fromId === teacher.id);
 
@@ -480,23 +572,19 @@ function MessagesView({ teacher }) {
             const other = directoryUsers.find(u => u.id === (m.fromId === teacher.id ? m.toId : m.fromId));
             const isSent = m.fromId === teacher.id;
             return (
-              <div key={m.id} style={{ padding:'14px 20px', borderBottom:'1px solid var(--border)' }}>
-                <div style={{ display:'flex', gap: 10, alignItems:'flex-start' }}>
-                  <span className={`avatar avatar-sm role-${other?.role}`}>{other?.avatar}</span>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display:'flex', justifyContent:'space-between', marginBottom: 2 }}>
-                      <span style={{ fontWeight: m.read || isSent ? 400 : 700, fontSize: 13 }}>
-                        {isSent ? '→ ' : ''}{other?.name}
-                      </span>
-                      <span style={{ fontSize: 11, color:'var(--text-muted)' }}>{m.date}</span>
-                    </div>
-                    <div style={{ fontWeight: m.read || isSent ? 400 : 600, fontSize: 13, marginBottom: 4 }}>{m.subject}</div>
-                    <div style={{ fontSize: 12, color:'var(--text-secondary)' }}>{m.body.substring(0, 100)}…</div>
-                  </div>
-                </div>
-              </div>
+              <MessageRow
+                key={m.id}
+                m={m}
+                other={other}
+                isSent={isSent}
+                expanded={expandedId === m.id}
+                onToggle={() => setExpandedId(id => (id === m.id ? null : m.id))}
+              />
             );
           })}
+          {myMessages.length === 0 && (
+            <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)' }}>No messages yet.</div>
+          )}
         </div>
       </div>
     </div>
@@ -504,15 +592,23 @@ function MessagesView({ teacher }) {
 }
 
 /* ── Root ──────────────────────────────────────────────────── */
-export default function TeacherDashboard({ activeTab }) {
+export default function TeacherDashboard({ activeTab, onTabChange }) {
   const { currentUser } = useAuth();
   const teacher = currentUser;
+  const [attendanceClassId, setAttendanceClassId] = useState(null);
+
+  // MyClasses' "Take Attendance" passes a classId through so the Attendance
+  // tab can open pre-selected to that class instead of defaulting to the first one.
+  const handleTabChange = (tab, classId) => {
+    if (tab === 'attendance' && classId != null) setAttendanceClassId(classId);
+    onTabChange?.(tab);
+  };
 
   const views = {
     dashboard:        <Dashboard teacher={teacher} />,
-    myclasses:        <MyClasses teacher={teacher} />,
+    myclasses:        <MyClasses teacher={teacher} onTabChange={handleTabChange} />,
     timetable:        <TeacherTimetable teacher={teacher} />,
-    attendance:       <AttendanceManagement />,
+    attendance:       <AttendanceManagement initialClassId={attendanceClassId} />,
     notes:            <NotesManagement />,
     homework:         <HomeworkManagement />,
     exams:            <ExamsView teacher={teacher} />,

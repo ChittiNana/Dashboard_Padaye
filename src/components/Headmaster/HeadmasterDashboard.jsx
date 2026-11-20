@@ -2,11 +2,10 @@ import { useState, useEffect } from 'react';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import * as attendanceApi from '../../api/attendanceApi';
-import * as timetableApi from '../../api/timetableApi';
 import * as reportingApi from '../../api/reportingApi';
 import { readWithFallback } from '../../api/mockFallback';
 import {
-  deriveClassTimetable, deriveSchoolAttendanceSummary, deriveAttendanceReport,
+  deriveSchoolAttendanceSummary, deriveAttendanceReport,
   deriveExamResultsReport, deriveStaffPerformanceReport,
 } from '../../data/mockStore';
 import Registration          from '../Auth/Registration';
@@ -17,19 +16,10 @@ import NoticeManagement       from '../Management/NoticeManagement';
 import HolidayManagement      from '../Management/HolidayManagement';
 import AttendanceManagement   from '../Management/AttendanceManagement';
 import HomeworkManagement     from '../Management/HomeworkManagement';
+import TimetableManagement    from '../Management/TimetableManagement';
 
-const DAY_ORDER = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
-function dayLabel(day) { return day.charAt(0) + day.slice(1).toLowerCase(); }
 function todayISO() { return new Date().toISOString().slice(0, 10); }
 function statusFor(e) { return e.examDate && e.examDate < todayISO() ? 'completed' : 'upcoming'; }
-function formatTime(t) {
-  if (!t) return '';
-  const [h, m] = t.split(':');
-  const hour = Number(h);
-  const period = hour >= 12 ? 'PM' : 'AM';
-  const displayHour = hour % 12 === 0 ? 12 : hour % 12;
-  return `${displayHour}:${m} ${period}`;
-}
 
 function StatCard({ icon, label, value, color }) {
   return (
@@ -152,78 +142,6 @@ function Dashboard() {
   );
 }
 
-/* ── Timetable View ─────────────────────────────────────────── */
-function TimetableView() {
-  const { classes } = useData();
-  const [selectedClassId, setSelectedClassId] = useState(null);
-  const [slots,   setSlots]   = useState([]);
-  const [loading, setLoading] = useState(false);
-  const subjectColors = {
-    Mathematics: '#ebf8ff', Science: '#f0fff4', English: '#faf5ff',
-    History: '#fffaf0', Geography: '#e6fffa', Computer: '#fff5f5',
-    PE: '#f0f4ff', Drawing: '#fff0f5',
-  };
-
-  useEffect(() => {
-    if (classes.length && selectedClassId === null) setSelectedClassId(classes[0].id);
-  }, [classes, selectedClassId]);
-
-  useEffect(() => {
-    let active = true;
-    if (selectedClassId === null) return;
-    setLoading(true);
-    readWithFallback(
-      () => timetableApi.getClassTimetable(selectedClassId),
-      () => deriveClassTimetable(selectedClassId),
-      { label: 'getClassTimetable' },
-    )
-      .then(data => { if (active) setSlots(data); })
-      .finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
-  }, [selectedClassId]);
-
-  const selectedClass = classes.find(c => c.id === selectedClassId);
-
-  return (
-    <div>
-      <div className="page-header">
-        <div className="page-header-left"><h1>School Timetable</h1></div>
-        <select className="form-control" style={{ width: 120 }}
-          value={selectedClassId ?? ''} onChange={e => setSelectedClassId(Number(e.target.value))}>
-          {classes.map(c => <option key={c.id} value={c.id}>Class {c.name}</option>)}
-        </select>
-      </div>
-      <div className="card">
-        <div className="card-header">
-          <div className="card-title">Class {selectedClass?.name || '—'} Weekly Schedule</div>
-        </div>
-        <div className="card-body" style={{ overflowX:'auto' }}>
-          {DAY_ORDER.map(day => {
-            const daySlots = slots.filter(s => s.dayOfWeek === day).sort((a, b) => a.periodNumber - b.periodNumber);
-            if (daySlots.length === 0) return null;
-            return (
-              <div key={day} style={{ marginBottom: 16 }}>
-                <div style={{ fontWeight: 700, fontSize: 13, color:'var(--text-muted)', marginBottom: 8, textTransform:'uppercase', letterSpacing:'0.05em' }}>{dayLabel(day)}</div>
-                <div style={{ display:'flex', gap: 8, flexWrap:'wrap' }}>
-                  {daySlots.map(p => (
-                    <div key={p.id} style={{ padding:'8px 12px', borderRadius: 8, background: subjectColors[p.subject] || '#f7fafc', border:'1px solid var(--border)', minWidth: 120, flex: '0 0 auto' }}>
-                      <div style={{ fontSize: 12, fontWeight: 600 }}>{p.subject}</div>
-                      <div style={{ fontSize: 10, color:'var(--text-muted)' }}>{formatTime(p.startTime)} – {formatTime(p.endTime)}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-          {!loading && slots.length === 0 && (
-            <div style={{ padding: 24, textAlign:'center', color:'var(--text-muted)', fontSize: 13 }}>No timetable slots for this class.</div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 /* ── Staff Overview ─────────────────────────────────────────── */
 function StaffOverview() {
   const { allStaff } = useAuth();
@@ -324,7 +242,7 @@ function Reports() {
       </div>
       <div className="dashboard-grid grid-2">
         {HEADMASTER_REPORTS.map(r => (
-          <div key={r.key} className="stat-card" style={{ cursor:'pointer' }}>
+          <div key={r.key} className="stat-card clickable" onClick={() => generate(r)}>
             <div className={`stat-icon ${r.color}`}>{r.icon}</div>
             <div className="stat-info">
               <div style={{ fontWeight: 600, fontSize: 15 }}>{r.title}</div>
@@ -386,7 +304,7 @@ export default function HeadmasterDashboard({ activeTab }) {
     dashboard:         <Dashboard />,
     registration:      <Registration />,
     classes:           <ClassManagement />,
-    timetable:         <TimetableView />,
+    timetable:         <TimetableManagement />,
     exams:             <ExamManagement />,
     'question-papers': <QuestionPaperManagement />,
     attendance:        <AttendanceManagement />,

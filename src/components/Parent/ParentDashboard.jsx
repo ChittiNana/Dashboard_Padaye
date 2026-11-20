@@ -1,11 +1,32 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import * as attendanceApi from '../../api/attendanceApi';
 import * as feeApi from '../../api/feeApi';
 import * as academicsApi from '../../api/academicsApi';
-import { readWithFallback, writeThroughMock } from '../../api/mockFallback';
-import { deriveStudentAttendance, deriveStudentFeeStatus, applyPayFee, deriveResultsByStudent } from '../../data/mockStore';
+import { readWithFallback, writeWithApi, isBackendUnavailable } from '../../api/mockFallback';
+import { errorText } from '../../utils/apiError';
+import { deriveStudentAttendance, deriveStudentFeeStatus, applyPayFee, deriveResultsByStudent, derivePaymentHistory } from '../../data/mockStore';
+import EventCalendar from '../Shared/EventCalendar';
+import ProfileAvatar from '../Shared/ProfileAvatar';
+
+// Real backend: 404 = this student has no fee record yet (-> null, not fake mock fees). Backend unreachable -> mock.
+// Other errors (403 not your child, 5xx) propagate to the caller.
+async function fetchFeeStatus(studentId) {
+  try {
+    return await feeApi.getStatusForStudent(studentId);
+  } catch (err) {
+    if (err?.status === 404) return null;
+    if (isBackendUnavailable(err)) return deriveStudentFeeStatus(studentId);
+    throw err;
+  }
+}
+
+function newIdempotencyKey() {
+  return (typeof crypto !== 'undefined' && crypto.randomUUID)
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(16).slice(2)}-${Math.random().toString(16).slice(2)}`;
+}
 function todayISO() { return new Date().toISOString().slice(0, 10); }
 
 /* ── Dashboard ──────────────────────────────────────────────── */
@@ -26,11 +47,9 @@ function Dashboard({ parent, children }) {
   const [feeStatus, setFeeStatus] = useState(null);
   useEffect(() => {
     if (!child) return;
-    readWithFallback(
-      () => feeApi.getStatusForStudent(child.id),
-      () => deriveStudentFeeStatus(child.id),
-      { label: 'getStatusForStudent' },
-    ).then(setFeeStatus);
+    fetchFeeStatus(child.id)
+      .then(setFeeStatus)
+      .catch(err => { console.warn('fee status unavailable', err); setFeeStatus(null); });
   }, [child]);
 
   const [myResults, setMyResults] = useState([]);
@@ -45,7 +64,7 @@ function Dashboard({ parent, children }) {
 
   if (!child) return <div className="empty-state"><div className="empty-state-icon">👶</div><h3>No children linked</h3></div>;
 
-  const childClassName = classes.find(c => c.id === child.classId)?.name;
+  const childClassName = classes.find(c => c.id === child.classId)?.name ?? child.classId;
   const attPct      = attSummary?.attendancePercentage ?? 0;
   const presentDays = attSummary?.presentDays ?? 0;
   const absentDays  = attSummary?.absentDays ?? 0;
@@ -66,7 +85,7 @@ function Dashboard({ parent, children }) {
       {/* Child Profile Card */}
       <div className="card mb-20" style={{ background:'linear-gradient(135deg, #1e3a5f, #2c5282)', color:'#fff' }}>
         <div className="card-body" style={{ display:'flex', alignItems:'center', gap: 20 }}>
-          <span className="avatar avatar-xl role-student" style={{ border:'3px solid rgba(255,255,255,0.3)' }}>{child.avatar}</span>
+          <ProfileAvatar image={child.profileImage} gender={child.gender} role="student" size={64} style={{ border:'3px solid rgba(255,255,255,0.3)' }} />
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 4 }}>{child.name}</div>
             <div style={{ opacity: 0.8, fontSize: 13 }}>
@@ -189,7 +208,7 @@ function Dashboard({ parent, children }) {
 function AttendanceView({ children }) {
   const { classes } = useData();
   const child = children[0];
-  const childClassName = classes.find(c => c.id === child?.classId)?.name;
+  const childClassName = classes.find(c => c.id === child?.classId)?.name ?? child?.classId;
 
   const [attSummary, setAttSummary] = useState(null);
   const [loading,    setLoading]    = useState(false);
@@ -334,7 +353,7 @@ function ExamResults({ children }) {
 function HomeworkView({ children }) {
   const { classes, homework } = useData();
   const child = children[0];
-  const childClassName = classes.find(c => c.id === child?.classId)?.name;
+  const childClassName = classes.find(c => c.id === child?.classId)?.name ?? child?.classId;
   const myHW  = homework.filter(h => h.classId === child?.classId);
 
   return (
@@ -380,46 +399,67 @@ function FeeStatus({ children }) {
   const child = children[0];
   const [feeStatus, setFeeStatus] = useState(null);
   const [loading,   setLoading]   = useState(false);
+  const [loadError, setLoadError]  = useState('');
+  const payKeyRef = useRef(null); // one Idempotency-Key per payment attempt
 
-  const [showPay,     setShowPay]     = useState(false);
+  const [showPay,    setShowPay]     = useState(false);
   const [payAmount,   setPayAmount]   = useState('');
   const [payMethod,   setPayMethod]   = useState('CASH');
   const [payRef,      setPayRef]      = useState('');
   const [payError,    setPayError]    = useState('');
   const [paySubmitting, setPaySubmitting] = useState(false);
 
+  const [historyRows,    setHistoryRows]    = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+
   const load = () => {
     if (!child) return;
     setLoading(true);
-    readWithFallback(
-      () => feeApi.getStatusForStudent(child.id),
-      () => deriveStudentFeeStatus(child.id),
-      { label: 'getStatusForStudent' },
-    )
+    setLoadError('');
+    fetchFeeStatus(child.id)
       .then(setFeeStatus)
+      .catch(err => { setFeeStatus(null); setLoadError(errorText(err, 'Could not load fee status.')); })
       .finally(() => setLoading(false));
   };
 
   useEffect(load, [child]);
 
-  const submitPay = () => {
+  useEffect(() => {
+    if (!feeStatus?.feeRecordId) { setHistoryRows([]); return; }
+    setHistoryLoading(true);
+    readWithFallback(
+      () => feeApi.getPaymentHistory(feeStatus.feeRecordId),
+      () => derivePaymentHistory(feeStatus.feeRecordId),
+      { label: 'getPaymentHistory' },
+    )
+      .then(setHistoryRows)
+      .finally(() => setHistoryLoading(false));
+  }, [feeStatus?.feeRecordId, feeStatus?.paidAmount]);
+
+  const submitPay = async () => {
     const amount = Number(payAmount);
     if (!amount || amount <= 0) { setPayError('Enter a valid amount.'); return; }
     setPaySubmitting(true);
     setPayError('');
-    const updated = writeThroughMock(
-      () => {
-        applyPayFee({ feeRecordId: feeStatus.feeRecordId, amount, method: payMethod, reference: payRef || undefined });
-        return deriveStudentFeeStatus(child.id);
-      },
-      () => feeApi.payFee({ feeRecordId: feeStatus.feeRecordId, amount, method: payMethod, reference: payRef || undefined }),
-      { label: 'payFee' },
-    );
-    setFeeStatus(updated);
-    setShowPay(false);
-    setPayAmount('');
-    setPayRef('');
-    setPaySubmitting(false);
+    try {
+      if (!payKeyRef.current) payKeyRef.current = newIdempotencyKey();
+      const body = { feeRecordId: feeStatus.feeRecordId, amount, method: payMethod, reference: payRef || undefined };
+      const { real } = await writeWithApi(
+        () => feeApi.payFee(body, payKeyRef.current),
+        () => applyPayFee(body),
+        { label: 'payFee' },
+      );
+      payKeyRef.current = null; // success: the next payment gets a new key
+      // Balances/status come from the server after a real payment; the mock store is derived locally.
+      setFeeStatus(real ? await fetchFeeStatus(child.id) : deriveStudentFeeStatus(child.id));
+      setShowPay(false);
+      setPayAmount('');
+      setPayRef('');
+    } catch (err) {
+      setPayError(errorText(err, 'Payment failed.'));
+    } finally {
+      setPaySubmitting(false);
+    }
   };
 
   return (
@@ -434,7 +474,7 @@ function FeeStatus({ children }) {
       {loading ? (
         <div className="card"><div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)' }}>Loading…</div></div>
       ) : !feeStatus ? (
-        <div className="card"><div className="empty-state"><div className="empty-state-icon">💰</div><h3>No fee records found</h3></div></div>
+        <div className="card"><div className="empty-state"><div className="empty-state-icon">💰</div><h3>No fee records found</h3>{loadError && <p>{loadError}</p>}</div></div>
       ) : (
         <>
           <div className="stat-grid mb-20">
@@ -450,7 +490,7 @@ function FeeStatus({ children }) {
             </div>
             <div className="card-body">
               {feeStatus.status !== 'PAID' && !showPay && (
-                <button className="btn btn-primary btn-sm" onClick={() => setShowPay(true)}>Pay Now</button>
+                <button className="btn btn-primary btn-sm" onClick={() => { payKeyRef.current = newIdempotencyKey(); setShowPay(true); }}>Pay Now</button>
               )}
               {showPay && (
                 <div style={{ marginTop: 12 }}>
@@ -471,6 +511,29 @@ function FeeStatus({ children }) {
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+
+          <div className="card mt-20">
+            <div className="card-header"><div className="card-title">Payment History</div></div>
+            <div className="table-wrapper">
+              <table>
+                <thead><tr><th>Date</th><th>Amount</th><th>Method</th><th>Reference</th></tr></thead>
+                <tbody>
+                  {historyLoading ? (
+                    <tr><td colSpan={4} style={{ textAlign: 'center', padding: 16, color: 'var(--text-muted)' }}>Loading…</td></tr>
+                  ) : historyRows.length === 0 ? (
+                    <tr><td colSpan={4} style={{ textAlign: 'center', padding: 16, color: 'var(--text-muted)' }}>No payments recorded yet.</td></tr>
+                  ) : historyRows.map(p => (
+                    <tr key={p.id}>
+                      <td style={{ fontSize: 12 }}>{new Date(p.paymentDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</td>
+                      <td style={{ fontWeight: 600 }}>₹{Number(p.amount).toLocaleString()}</td>
+                      <td style={{ fontSize: 12 }}>{FEE_METHOD_LABELS[p.method] || p.method}</td>
+                      <td style={{ fontSize: 12 }}>{p.reference || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         </>
@@ -519,7 +582,7 @@ function ContactTeacher({ parent, children }) {
           <div key={t.id} className="card" style={{ cursor:'pointer', border: selected?.id === t.id ? '2px solid var(--secondary)' : undefined }}
             onClick={() => setSelected(t)}>
             <div className="card-body" style={{ textAlign:'center', padding: 20 }}>
-              <span className="avatar avatar-lg role-teacher" style={{ margin:'0 auto 10px' }}>{t.avatar}</span>
+              <ProfileAvatar image={t.profileImage} gender={t.gender} role="teacher" size={48} style={{ margin:'0 auto 10px' }} />
               <div style={{ fontWeight:700, fontSize:14 }}>{t.name}</div>
               <div style={{ fontSize:12, color:'var(--text-muted)', marginBottom:6 }}>{t.staffCode}</div>
               <div style={{ fontSize:11, color:'var(--text-secondary)' }}>{t.email}</div>
@@ -621,6 +684,7 @@ function AcademicCalendar() {
   return (
     <div>
       <div className="page-header"><div className="page-header-left"><h1>Academic Calendar</h1></div></div>
+      <EventCalendar events={holidays} title="Calendar" />
       <div className="card">
         <div className="card-header"><div className="card-title">Upcoming Holidays ({upcoming.length})</div></div>
         <div className="table-wrapper">

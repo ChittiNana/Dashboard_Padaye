@@ -3,7 +3,6 @@ import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import * as attendanceApi from '../../api/attendanceApi';
 import * as reportingApi from '../../api/reportingApi';
-import { schoolInfo } from '../../data/mockData';
 import { readWithFallback } from '../../api/mockFallback';
 import {
   deriveSchoolAttendanceSummary, deriveAttendanceReport, deriveExamResultsReport,
@@ -17,6 +16,9 @@ import NoticeManagement       from '../Management/NoticeManagement';
 import HolidayManagement      from '../Management/HolidayManagement';
 import FeeManagement          from '../Management/FeeManagement';
 import AttendanceManagement   from '../Management/AttendanceManagement';
+import TimetableManagement    from '../Management/TimetableManagement';
+import SubjectManagement      from '../Management/SubjectManagement';
+import SchoolSettings         from '../Management/SchoolSettings';
 
 function todayISO() { return new Date().toISOString().slice(0, 10); }
 function statusFor(e) { return e.examDate && e.examDate < todayISO() ? 'completed' : 'upcoming'; }
@@ -36,7 +38,7 @@ function StatCard({ icon, label, value, color, change }) {
 
 /* ── Dashboard ─────────────────────────────────────────────── */
 function Dashboard() {
-  const { classes, exams, announcements, fees } = useData();
+  const { classes, exams, announcements, fees, schoolInfo } = useData();
   const { allStaff, allStudents, allUsers } = useAuth();
   const teachers = allStaff.filter(u => u.role === 'teacher');
   const students = allStudents;
@@ -215,7 +217,7 @@ function StaffManagement() {
         <div className="table-wrapper">
           <table>
             <thead>
-              <tr><th>Staff Member</th><th>Role</th><th>Staff Code</th><th>Phone</th><th>Email</th></tr>
+              <tr><th>Staff Member</th><th>Role</th><th>Subject</th><th>Staff Code</th><th>Phone</th><th>Email</th></tr>
             </thead>
             <tbody>
               {filtered.map(s => (
@@ -230,6 +232,7 @@ function StaffManagement() {
                     </div>
                   </td>
                   <td><span className={`badge badge-${s.role === 'headmaster' ? 'purple' : 'info'}`} style={{ textTransform:'capitalize' }}>{s.role}</span></td>
+                  <td>{s.role === 'teacher' ? (s.subject || '—') : '—'}</td>
                   <td>{s.staffCode || '—'}</td>
                   <td style={{ fontSize: 12 }}>{s.phone}</td>
                   <td style={{ fontSize: 12 }}>{s.email}</td>
@@ -342,7 +345,7 @@ function Reports() {
       </div>
       <div className="dashboard-grid grid-3">
         {PRINCIPAL_REPORTS.map(r => (
-          <div key={r.key} className="stat-card" style={{ flexDirection:'column', alignItems:'flex-start', cursor:'pointer' }}>
+          <div key={r.key} className="stat-card clickable" style={{ flexDirection:'column', alignItems:'flex-start' }} onClick={() => generate(r)}>
             <div className={`stat-icon ${r.color}`} style={{ marginBottom: 12 }}>{r.icon}</div>
             <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 4 }}>{r.title}</div>
             <div style={{ fontSize: 12, color:'var(--text-muted)', marginBottom: 12 }}>{r.desc}</div>
@@ -514,10 +517,13 @@ export default function PrincipalDashboard({ activeTab }) {
     staff:             <StaffManagement />,
     students:          <AllStudents />,
     classes:           <ClassManagement />,
+    subjects:          <SubjectManagement />,
+    'school-settings': <SchoolSettings />,
     fees:              <FeeManagement />,
     exams:             <ExamManagement />,
     'question-papers': <QuestionPaperManagement />,
     attendance:        <AttendanceManagement />,
+    'timetable-approvals': <TimetableManagement />,
     holidays:          <HolidayManagement canEdit />,
     notices:           <NoticeManagement canPost />,
     messages:          <Messages />,

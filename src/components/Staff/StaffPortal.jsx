@@ -1,10 +1,10 @@
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
-import { schoolInfo } from '../../data/mockData';
 import FeeManagement from '../Management/FeeManagement';
+import EventCalendar from '../Shared/EventCalendar';
 
 function Dashboard({ user }) {
-  const { announcements } = useData();
+  const { announcements, schoolInfo } = useData();
   const roleLabel = user.role === 'support_staff'
     ? 'Support Staff'
     : user.role.charAt(0).toUpperCase() + user.role.slice(1);
@@ -132,6 +132,7 @@ function HolidaysView() {
   return (
     <div>
       <div className="page-header"><div className="page-header-left"><h1>Holiday Calendar</h1></div></div>
+      <EventCalendar events={holidays} title="Calendar" />
       <div className="card">
         <div className="table-wrapper">
           <table>

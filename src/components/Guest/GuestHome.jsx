@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { schoolInfo } from '../../data/mockData';
 import { useData } from '../../context/DataContext';
+import EventCalendar from '../Shared/EventCalendar';
 
 export default function GuestHome({ onLogin }) {
-  const { holidays } = useData();
+  const { holidays, schoolInfo } = useData();
   const badgeColors = { National:'badge-danger', Festival:'badge-warning', Regional:'badge-purple' };
   const [tab, setTab] = useState('about');
 
@@ -56,55 +56,31 @@ export default function GuestHome({ onLogin }) {
       </div>
 
       {tab === 'about' && (
-        <div className="dashboard-grid grid-2">
-          <div className="card">
-            <div className="card-header"><div className="card-title">Contact Information</div></div>
-            <div className="card-body">
-              {[
-                ['📍', 'Address', schoolInfo.address],
-                ['📞', 'Phone',   schoolInfo.phone],
-                ['✉️', 'Email',   schoolInfo.email],
-                ['🌐', 'Website', schoolInfo.website],
-                ['🎓', 'Principal', schoolInfo.principalName],
-              ].map(([icon, label, val]) => (
-                <div key={label} style={{ display:'flex', gap:10, marginBottom:12 }}>
-                  <span style={{ fontSize:18, flexShrink:0 }}>{icon}</span>
-                  <div>
-                    <div style={{ fontSize:11, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.04em' }}>{label}</div>
-                    <div style={{ fontSize:13, fontWeight:500, marginTop:2 }}>{val}</div>
-                  </div>
+        <div className="card" style={{ maxWidth: 440 }}>
+          <div className="card-header"><div className="card-title">Contact Information</div></div>
+          <div className="card-body">
+            {[
+              ['📍', 'Address', schoolInfo.address],
+              ['📞', 'Phone',   schoolInfo.phone],
+              ['✉️', 'Email',   schoolInfo.email],
+              ['🌐', 'Website', schoolInfo.website],
+              ['🎓', 'Principal', schoolInfo.principalName],
+            ].map(([icon, label, val]) => (
+              <div key={label} style={{ display:'flex', gap:10, marginBottom:12 }}>
+                <span style={{ fontSize:18, flexShrink:0 }}>{icon}</span>
+                <div>
+                  <div style={{ fontSize:11, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.04em' }}>{label}</div>
+                  <div style={{ fontSize:13, fontWeight:500, marginTop:2 }}>{val}</div>
                 </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="card">
-            <div className="card-header"><div className="card-title">Portal Access Guide</div></div>
-            <div className="card-body">
-              {[
-                { role:'Principal',  icon:'👑', desc:'Full school oversight and administration',           color:'bg-red'    },
-                { role:'Headmaster', icon:'🎓', desc:'Academic management and staff coordination',        color:'bg-purple' },
-                { role:'Teacher',    icon:'👨‍🏫', desc:'Class management, attendance, and grades',        color:'bg-blue'   },
-                { role:'Student',    icon:'📚', desc:'Timetable, notes, homework, exams, results',       color:'bg-green'  },
-                { role:'Parent',     icon:'👨‍👩‍👧', desc:'Monitor child\'s progress, fees, and contact teachers', color:'bg-orange' },
-              ].map(r => (
-                <div key={r.role} style={{ display:'flex', gap:12, alignItems:'center', marginBottom:12, padding:'8px 10px', background:'var(--bg-app)', borderRadius:8 }}>
-                  <div className={`stat-icon ${r.color}`} style={{ width:36, height:36, fontSize:16 }}>{r.icon}</div>
-                  <div>
-                    <div style={{ fontWeight:600, fontSize:13 }}>{r.role}</div>
-                    <div style={{ fontSize:11, color:'var(--text-muted)' }}>{r.desc}</div>
-                  </div>
-                </div>
-              ))}
-              <button className="btn btn-primary w-full" style={{ marginTop:8 }} onClick={onLogin}>
-                Sign In to Portal
-              </button>
-            </div>
+              </div>
+            ))}
           </div>
         </div>
       )}
 
       {tab === 'holidays' && (
+        <>
+        <EventCalendar events={holidays} title="Calendar" />
         <div className="card">
           <div className="table-wrapper">
             <table>
@@ -124,6 +100,7 @@ export default function GuestHome({ onLogin }) {
             </table>
           </div>
         </div>
+        </>
       )}
     </div>
   );

@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { useData } from '../../context/DataContext';
+import { errorText } from '../../utils/apiError';
 
 const BLANK = { classId: '', subject: '', examDate: '', maxMarks: 50 };
-const SUBJECTS = ['Mathematics', 'Science', 'English', 'History', 'Geography', 'Computer', 'PE', 'Drawing'];
 
 const today = () => new Date().toISOString().slice(0, 10);
 
 export default function ExamManagement() {
-  const { exams, classes, addExam } = useData();
+  const { exams, classes, subjects, addExam } = useData();
 
   const [showForm,     setShowForm]     = useState(false);
   const [form,         setForm]         = useState(BLANK);
@@ -27,13 +27,14 @@ export default function ExamManagement() {
 
   const submit = async () => {
     if (!form.classId || !form.subject || !form.examDate) return;
+    if (!(Number(form.maxMarks) > 0)) { setSubmitError('Max marks must be greater than 0.'); return; }
     setSubmitting(true);
     setSubmitError('');
     try {
       await addExam({ classId: Number(form.classId), subject: form.subject, examDate: form.examDate, maxMarks: Number(form.maxMarks) });
       reset();
     } catch (err) {
-      setSubmitError(err.message || 'Failed to schedule exam');
+      setSubmitError(errorText(err, 'Failed to schedule exam'));
     } finally {
       setSubmitting(false);
     }
@@ -74,7 +75,7 @@ export default function ExamManagement() {
                 <label className="form-label">Subject *</label>
                 <select className="form-control" value={form.subject} onChange={e => set('subject', e.target.value)}>
                   <option value="">Select subject…</option>
-                  {SUBJECTS.map(s => <option key={s} value={s}>{s}</option>)}
+                  {subjects.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
                 </select>
               </div>
               <div className="form-group">

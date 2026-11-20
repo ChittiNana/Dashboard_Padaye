@@ -277,6 +277,7 @@ ul { list-style: none; }
 .avatar-sm  { width: 28px; height: 28px; font-size: 11px; }
 .avatar-lg  { width: 48px; height: 48px; font-size: 16px; }
 .avatar-xl  { width: 64px; height: 64px; font-size: 22px; }
+.avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
 
 .role-principal  { background: linear-gradient(135deg, #c53030, #9b2c2c); }
 .role-headmaster { background: linear-gradient(135deg, #2d3748, #1a202c); }
@@ -318,7 +319,8 @@ ul { list-style: none; }
   gap: 14px;
   transition: transform var(--transition), box-shadow var(--transition);
 }
-.stat-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+.stat-card.clickable { cursor: pointer; }
+.stat-card.clickable:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
 .stat-icon {
   width: 48px; height: 48px;
   border-radius: var(--radius);
@@ -583,6 +585,7 @@ textarea.form-control { resize: vertical; min-height: 90px; }
 .login-brand-sub  { font-size: 14px; opacity: 0.75; max-width: 280px; line-height: 1.6; }
 .login-stats { display: flex; gap: 32px; margin-top: 40px; }
 .login-stat  { text-align: center; }
+.login-stat-icon { font-size: 22px; margin-bottom: 4px; }
 .login-stat-val { font-size: 28px; font-weight: 700; }
 .login-stat-lbl { font-size: 12px; opacity: 0.7; margin-top: 2px; }
 

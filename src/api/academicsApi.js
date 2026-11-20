@@ -21,3 +21,7 @@ export function createQuestionPaper(body) { return apiFetch('/api/question-paper
 export function listResults() { return apiFetch('/api/results'); }
 export function getResultsByStudent(studentId) { return apiFetch(`/api/results/student/${studentId}`); }
 export function createResult(body) { return apiFetch('/api/results', { method: 'POST', body }); }
+
+export function getMyAttempt(paperId) { return apiFetch(`/api/exam-attempts/paper/${paperId}/mine`); }
+export function startExamAttempt(body) { return apiFetch('/api/exam-attempts/start', { method: 'POST', body }); }
+export function submitExamAttempt(attemptId, body) { return apiFetch(`/api/exam-attempts/${attemptId}/submit`, { method: 'POST', body }); }

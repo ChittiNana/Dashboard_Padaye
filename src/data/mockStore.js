@@ -2,6 +2,8 @@
 // Persists to localStorage so data survives logout/login across roles, and
 // reseeds from scratch after MOCK_STORE_TTL_MS so stale demo data doesn't pile up.
 
+import { defaultSchoolInfo, defaultIdFormat, defaultSubjects, defaultClasses } from '../config/schoolConfig';
+
 const STORAGE_KEY = 'padaye_mock_store_v1';
 const MOCK_STORE_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -24,50 +26,56 @@ function buildSeed() {
   const weekdays = recentWeekdays(10);
 
   const users = [
-    { id: 1,  username: 'principal',   password: 'principal123', role: 'principal',     name: 'Dr. Rajesh Kumar',  avatar: 'RK',  email: 'principal@greenwood.edu',    phone: '+91-98765-43210', joinDate: '2015-06-01' },
-    { id: 2,  username: 'headmaster',  password: 'head123',      role: 'headmaster',    name: 'Mrs. Priya Sharma', avatar: 'PS',  email: 'headmaster@greenwood.edu',   phone: '+91-98765-43211', joinDate: '2017-07-15' },
-    { id: 3,  username: 'teacher1',    password: 'teach123',     role: 'teacher',       name: 'Mr. Amit Verma',    avatar: 'AV',  email: 'amit.verma@greenwood.edu',   phone: '+91-98765-43212', joinDate: '2018-06-01' },
-    { id: 4,  username: 'teacher2',    password: 'teach123',     role: 'teacher',       name: 'Ms. Sunita Patel',  avatar: 'SP',  email: 'sunita.patel@greenwood.edu', phone: '+91-98765-43213', joinDate: '2019-07-01' },
-    { id: 5,  username: 'teacher3',    password: 'teach123',     role: 'teacher',       name: 'Mr. John Davis',    avatar: 'JD',  email: 'john.davis@greenwood.edu',   phone: '+91-98765-43214', joinDate: '2020-06-01' },
-    { id: 6,  username: 'student1',    password: 'stud123',      role: 'student',       name: 'Rahul Singh',       avatar: 'RS' },
-    { id: 7,  username: 'student2',    password: 'stud123',      role: 'student',       name: 'Priya Kapoor',      avatar: 'PK' },
-    { id: 8,  username: 'student3',    password: 'stud123',      role: 'student',       name: 'Arjun Mehta',       avatar: 'AM' },
-    { id: 9,  username: 'parent1',     password: 'par123',       role: 'parent',        name: 'Mr. Ravi Singh',    avatar: 'RVS', email: 'ravi.singh@gmail.com',   phone: '+91-98765-43215' },
-    { id: 10, username: 'parent2',     password: 'par123',       role: 'parent',        name: 'Mrs. Anita Kapoor', avatar: 'ANK', email: 'anita.kapoor@gmail.com', phone: '+91-98765-43216' },
-    { id: 11, username: 'parent3',     password: 'par123',       role: 'parent',        name: 'Mr. Suresh Mehta',  avatar: 'SRM', email: 'suresh.mehta@gmail.com', phone: '+91-98765-43217' },
-    { id: 12, username: 'guest',       password: 'guest',        role: 'guest',         name: 'Guest User',        avatar: 'GU' },
-    { id: 13, username: 'accountant1', password: 'acc123',       role: 'accountant',    name: 'Ms. Kavya Sharma',  avatar: 'KSH', email: 'kavya.sharma@greenwood.edu', phone: '+91-98765-43220', joinDate: '2019-01-15' },
-    { id: 14, username: 'gatekeeper1', password: 'gate123',      role: 'support_staff', name: 'Mr. Ramesh Kumar',  avatar: 'RMK', email: 'ramesh.kumar@greenwood.edu', phone: '+91-98765-43221', joinDate: '2020-03-01' },
-    { id: 18, username: 'teacher4',    password: 'teach123',     role: 'teacher',       name: 'Mrs. Geeta Nair',   avatar: 'GN',  email: 'geeta.nair@greenwood.edu',   phone: '+91-98765-43225', joinDate: '2016-06-01' },
-    { id: 19, username: 'teacher5',    password: 'teach123',     role: 'teacher',       name: 'Mr. Arun Roy',      avatar: 'AR',  email: 'arun.roy@greenwood.edu',     phone: '+91-98765-43226', joinDate: '2017-06-01' },
+    { id: 1,  username: 'principal',   password: 'principal123', role: 'principal',     name: 'Dr. Rajesh Kumar',  avatar: 'RK',  email: 'principal@greenwood.edu',    phone: '+91-98765-43210', joinDate: '2015-06-01', gender: 'Male' },
+    { id: 2,  username: 'headmaster',  password: 'head123',      role: 'headmaster',    name: 'Mrs. Priya Sharma', avatar: 'PS',  email: 'headmaster@greenwood.edu',   phone: '+91-98765-43211', joinDate: '2017-07-15', gender: 'Female' },
+    { id: 3,  username: 'teacher1',    password: 'teach123',     role: 'teacher',       name: 'Mr. Amit Verma',    avatar: 'AV',  email: 'amit.verma@greenwood.edu',   phone: '+91-98765-43212', joinDate: '2018-06-01', gender: 'Male' },
+    { id: 4,  username: 'teacher2',    password: 'teach123',     role: 'teacher',       name: 'Ms. Sunita Patel',  avatar: 'SP',  email: 'sunita.patel@greenwood.edu', phone: '+91-98765-43213', joinDate: '2019-07-01', gender: 'Female' },
+    { id: 5,  username: 'teacher3',    password: 'teach123',     role: 'teacher',       name: 'Mr. John Davis',    avatar: 'JD',  email: 'john.davis@greenwood.edu',   phone: '+91-98765-43214', joinDate: '2020-06-01', gender: 'Male' },
+    { id: 6,  username: 'student1',    password: 'stud123',      role: 'student',       name: 'Rahul Singh',       avatar: 'RS',  gender: 'Male' },
+    { id: 7,  username: 'student2',    password: 'stud123',      role: 'student',       name: 'Priya Kapoor',      avatar: 'PK',  gender: 'Female' },
+    { id: 8,  username: 'student3',    password: 'stud123',      role: 'student',       name: 'Arjun Mehta',       avatar: 'AM',  gender: 'Male' },
+    { id: 9,  username: 'parent1',     password: 'par123',       role: 'parent',        name: 'Mr. Ravi Singh',    avatar: 'RVS', email: 'ravi.singh@gmail.com',   phone: '+91-98765-43215', gender: 'Male' },
+    { id: 10, username: 'parent2',     password: 'par123',       role: 'parent',        name: 'Mrs. Anita Kapoor', avatar: 'ANK', email: 'anita.kapoor@gmail.com', phone: '+91-98765-43216', gender: 'Female' },
+    { id: 11, username: 'parent3',     password: 'par123',       role: 'parent',        name: 'Mr. Suresh Mehta',  avatar: 'SRM', email: 'suresh.mehta@gmail.com', phone: '+91-98765-43217', gender: 'Male' },
+    { id: 12, username: 'guest',       password: 'guest',        role: 'guest',         name: 'Guest User',        avatar: 'GU',  gender: 'Other' },
+    { id: 13, username: 'accountant1', password: 'acc123',       role: 'accountant',    name: 'Ms. Kavya Sharma',  avatar: 'KSH', email: 'kavya.sharma@greenwood.edu', phone: '+91-98765-43220', joinDate: '2019-01-15', gender: 'Female' },
+    { id: 14, username: 'gatekeeper1', password: 'gate123',      role: 'support_staff', name: 'Mr. Ramesh Kumar',  avatar: 'RMK', email: 'ramesh.kumar@greenwood.edu', phone: '+91-98765-43221', joinDate: '2020-03-01', gender: 'Male' },
+    { id: 18, username: 'teacher4',    password: 'teach123',     role: 'teacher',       name: 'Mrs. Geeta Nair',   avatar: 'GN',  email: 'geeta.nair@greenwood.edu',   phone: '+91-98765-43225', joinDate: '2016-06-01', gender: 'Female' },
+    { id: 19, username: 'teacher5',    password: 'teach123',     role: 'teacher',       name: 'Mr. Arun Roy',      avatar: 'AR',  email: 'arun.roy@greenwood.edu',     phone: '+91-98765-43226', joinDate: '2017-06-01', gender: 'Male' },
   ];
 
   const students = [
-    { id: 6, firstName: 'Rahul', lastName: 'Singh',  admissionNumber: 'ADM2020006', classId: 1, dateOfBirth: '2009-05-15', guardianName: 'Mr. Ravi Singh',    guardianPhone: '+91-98765-43215', bloodGroup: 'O+', gender: 'Male',   parentUserId: 9 },
-    { id: 7, firstName: 'Priya', lastName: 'Kapoor', admissionNumber: 'ADM2020007', classId: 1, dateOfBirth: '2009-08-22', guardianName: 'Mrs. Anita Kapoor', guardianPhone: '+91-98765-43216', bloodGroup: 'B+', gender: 'Female', parentUserId: 10 },
-    { id: 8, firstName: 'Arjun', lastName: 'Mehta',  admissionNumber: 'ADM2021008', classId: 3, dateOfBirth: '2010-03-10', guardianName: 'Mr. Suresh Mehta',  guardianPhone: '+91-98765-43217', bloodGroup: 'A+', gender: 'Male',   parentUserId: 11 },
+    { id: 6, firstName: 'Rahul', lastName: 'Singh',  admissionNumber: 'ADM2020006', classId: 1, dateOfBirth: '2009-05-15', guardianName: 'Mr. Ravi Singh',    guardianPhone: '+91-98765-43215', bloodGroup: 'O+', gender: 'Male',   parentUserId: 9,  profileImage: null },
+    { id: 7, firstName: 'Priya', lastName: 'Kapoor', admissionNumber: 'ADM2020007', classId: 1, dateOfBirth: '2009-08-22', guardianName: 'Mrs. Anita Kapoor', guardianPhone: '+91-98765-43216', bloodGroup: 'B+', gender: 'Female', parentUserId: 10, profileImage: null },
+    { id: 8, firstName: 'Arjun', lastName: 'Mehta',  admissionNumber: 'ADM2021008', classId: 3, dateOfBirth: '2010-03-10', guardianName: 'Mr. Suresh Mehta',  guardianPhone: '+91-98765-43217', bloodGroup: 'A+', gender: 'Male',   parentUserId: 11, profileImage: null },
   ];
 
   const staff = [
-    { id: 1,  firstName: 'Rajesh', lastName: 'Kumar',  staffCode: 'EMP001', staffRole: 'PRINCIPAL',     email: 'principal@greenwood.edu',    phone: '+91-98765-43210', active: true },
-    { id: 2,  firstName: 'Priya',  lastName: 'Sharma', staffCode: 'EMP002', staffRole: 'HEADMASTER',    email: 'headmaster@greenwood.edu',   phone: '+91-98765-43211', active: true },
-    { id: 3,  firstName: 'Amit',   lastName: 'Verma',  staffCode: 'EMP003', staffRole: 'TEACHER',       email: 'amit.verma@greenwood.edu',   phone: '+91-98765-43212', active: true, subject: 'Mathematics' },
-    { id: 4,  firstName: 'Sunita', lastName: 'Patel',  staffCode: 'EMP004', staffRole: 'TEACHER',       email: 'sunita.patel@greenwood.edu', phone: '+91-98765-43213', active: true, subject: 'Science' },
-    { id: 5,  firstName: 'John',   lastName: 'Davis',  staffCode: 'EMP005', staffRole: 'TEACHER',       email: 'john.davis@greenwood.edu',   phone: '+91-98765-43214', active: true, subject: 'English' },
-    { id: 13, firstName: 'Kavya',  lastName: 'Sharma', staffCode: 'EMP013', staffRole: 'ACCOUNTANT',    email: 'kavya.sharma@greenwood.edu', phone: '+91-98765-43220', active: true },
-    { id: 14, firstName: 'Ramesh', lastName: 'Kumar',  staffCode: 'EMP014', staffRole: 'SUPPORT_STAFF', email: 'ramesh.kumar@greenwood.edu', phone: '+91-98765-43221', active: true },
-    { id: 18, firstName: 'Geeta',  lastName: 'Nair',   staffCode: 'EMP018', staffRole: 'TEACHER',       email: 'geeta.nair@greenwood.edu',   phone: '+91-98765-43225', active: true, subject: 'History' },
-    { id: 19, firstName: 'Arun',   lastName: 'Roy',    staffCode: 'EMP019', staffRole: 'TEACHER',       email: 'arun.roy@greenwood.edu',     phone: '+91-98765-43226', active: true, subject: 'Geography' },
+    { id: 1,  firstName: 'Rajesh', lastName: 'Kumar',  staffCode: 'EMP001', staffRole: 'PRINCIPAL',     email: 'principal@greenwood.edu',    phone: '+91-98765-43210', active: true, gender: 'Male',   profileImage: null },
+    { id: 2,  firstName: 'Priya',  lastName: 'Sharma', staffCode: 'EMP002', staffRole: 'HEADMASTER',    email: 'headmaster@greenwood.edu',   phone: '+91-98765-43211', active: true, gender: 'Female', profileImage: null },
+    { id: 3,  firstName: 'Amit',   lastName: 'Verma',  staffCode: 'EMP003', staffRole: 'TEACHER',       email: 'amit.verma@greenwood.edu',   phone: '+91-98765-43212', active: true, subject: 'Mathematics', gender: 'Male',   profileImage: null },
+    { id: 4,  firstName: 'Sunita', lastName: 'Patel',  staffCode: 'EMP004', staffRole: 'TEACHER',       email: 'sunita.patel@greenwood.edu', phone: '+91-98765-43213', active: true, subject: 'Science',     gender: 'Female', profileImage: null },
+    { id: 5,  firstName: 'John',   lastName: 'Davis',  staffCode: 'EMP005', staffRole: 'TEACHER',       email: 'john.davis@greenwood.edu',   phone: '+91-98765-43214', active: true, subject: 'English',     gender: 'Male',   profileImage: null },
+    { id: 13, firstName: 'Kavya',  lastName: 'Sharma', staffCode: 'EMP013', staffRole: 'ACCOUNTANT',    email: 'kavya.sharma@greenwood.edu', phone: '+91-98765-43220', active: true, gender: 'Female', profileImage: null },
+    { id: 14, firstName: 'Ramesh', lastName: 'Kumar',  staffCode: 'EMP014', staffRole: 'SUPPORT_STAFF', email: 'ramesh.kumar@greenwood.edu', phone: '+91-98765-43221', active: true, gender: 'Male',   profileImage: null },
+    { id: 18, firstName: 'Geeta',  lastName: 'Nair',   staffCode: 'EMP018', staffRole: 'TEACHER',       email: 'geeta.nair@greenwood.edu',   phone: '+91-98765-43225', active: true, subject: 'History',     gender: 'Female', profileImage: null },
+    { id: 19, firstName: 'Arun',   lastName: 'Roy',    staffCode: 'EMP019', staffRole: 'TEACHER',       email: 'arun.roy@greenwood.edu',     phone: '+91-98765-43226', active: true, subject: 'Geography',   gender: 'Male',   profileImage: null },
   ];
 
-  const classes = [
-    { id: 1, name: '10A', gradeLevel: 10, section: 'A', classTeacherStaffId: 3, active: true },
-    { id: 2, name: '10B', gradeLevel: 10, section: 'B', classTeacherStaffId: 5, active: true },
-    { id: 3, name: '9A',  gradeLevel: 9,  section: 'A', classTeacherStaffId: 3, active: true },
-    { id: 4, name: '9B',  gradeLevel: 9,  section: 'B', classTeacherStaffId: 5, active: true },
-    { id: 5, name: '8A',  gradeLevel: 8,  section: 'A', classTeacherStaffId: 4, active: true },
-    { id: 6, name: '8B',  gradeLevel: 8,  section: 'B', classTeacherStaffId: 4, active: true },
-  ];
+  // Starting classes/sections come from the editable config file, not hardcoded here.
+  const classes = defaultClasses.map((c, i) => ({
+    id: i + 1,
+    name: `${c.gradeLevel}${c.section}`,
+    gradeLevel: c.gradeLevel,
+    section: c.section,
+    classTeacherStaffId: c.classTeacherStaffId ?? null,
+    feeAmount: c.feeAmount ?? null,
+    active: true,
+  }));
+
+  // Starting subjects likewise come from the config file; from here on they
+  // live in their own mock table (editable via the Principal's Subjects screen).
+  const subjects = defaultSubjects.map((name, i) => ({ id: i + 1, name }));
 
   const exams = [
     { id: 1,  classId: 1, subject: 'Mathematics', examDate: '2026-08-10', maxMarks: 50 },
@@ -231,18 +239,27 @@ function buildSeed() {
   ];
 
   const notices = [
-    { id: 1, title: 'Annual Sports Day Registrations Open',   body: 'Annual Sports Day will be held on September 20, 2026. Registrations are now open. Submit names to your class teacher by August 15, 2026.', audienceRole: 'ALL',    postedByUserId: 1, createdAt: '2026-08-01T08:00:00Z' },
-    { id: 2, title: 'Parent-Teacher Meeting – Class 10',      body: 'A Parent-Teacher meeting for Class 10 students is scheduled on August 8, 2026 from 10:00 AM to 1:00 PM.',                                   audienceRole: 'PARENT', postedByUserId: 2, createdAt: '2026-07-30T08:00:00Z' },
-    { id: 3, title: 'Unit Test 1 Schedule Released',          body: 'The Unit Test 1 schedule has been released. Tests will be conducted from August 10–20, 2026.',                                              audienceRole: 'ALL',    postedByUserId: 2, createdAt: '2026-07-28T08:00:00Z' },
-    { id: 4, title: 'Library Renovation Notice',              body: 'The school library will be closed for renovation from August 5–10, 2026.',                                                                   audienceRole: 'ALL',    postedByUserId: 1, createdAt: '2026-07-25T08:00:00Z' },
-    { id: 5, title: 'Independence Day Celebration Programme', body: 'Independence Day celebrations will be held on August 15, 2026 at 8:00 AM in the school ground. Attendance is compulsory.',                   audienceRole: 'ALL',    postedByUserId: 1, createdAt: '2026-08-03T08:00:00Z' },
-    { id: 6, title: 'Fee Reminder – Second Instalment',       body: 'This is a reminder that the second instalment of school fees is due by August 31, 2026.',                                                     audienceRole: 'PARENT', postedByUserId: 13, createdAt: '2026-07-20T08:00:00Z' },
+    { id: 1, title: 'Annual Sports Day Registrations Open',   body: 'Annual Sports Day will be held on September 20, 2026. Registrations are now open. Submit names to your class teacher by August 15, 2026.', audienceRoles: [],          postedByUserId: 1, createdAt: '2026-08-01T08:00:00Z' },
+    { id: 2, title: 'Parent-Teacher Meeting – Class 10',      body: 'A Parent-Teacher meeting for Class 10 students is scheduled on August 8, 2026 from 10:00 AM to 1:00 PM.',                                   audienceRoles: ['PARENT'],  postedByUserId: 2, createdAt: '2026-07-30T08:00:00Z' },
+    { id: 3, title: 'Unit Test 1 Schedule Released',          body: 'The Unit Test 1 schedule has been released. Tests will be conducted from August 10–20, 2026.',                                              audienceRoles: [],          postedByUserId: 2, createdAt: '2026-07-28T08:00:00Z' },
+    { id: 4, title: 'Library Renovation Notice',              body: 'The school library will be closed for renovation from August 5–10, 2026.',                                                                   audienceRoles: [],          postedByUserId: 1, createdAt: '2026-07-25T08:00:00Z' },
+    { id: 5, title: 'Independence Day Celebration Programme', body: 'Independence Day celebrations will be held on August 15, 2026 at 8:00 AM in the school ground. Attendance is compulsory.',                   audienceRoles: [],          postedByUserId: 1, createdAt: '2026-08-03T08:00:00Z' },
+    { id: 6, title: 'Fee Reminder – Second Instalment',       body: 'This is a reminder that the second instalment of school fees is due by August 31, 2026.',                                                     audienceRoles: ['PARENT', 'ACCOUNTANT'], postedByUserId: 13, createdAt: '2026-07-20T08:00:00Z' },
   ];
 
   const fees = [
     { id: 1, studentId: 6, academicYear: '2026-27', totalAmount: 48000, paidAmount: 12000, dueDate: '2026-08-31', status: 'PARTIAL' },
     { id: 2, studentId: 7, academicYear: '2026-27', totalAmount: 48000, paidAmount: 24000, dueDate: '2026-08-31', status: 'PARTIAL' },
     { id: 3, studentId: 8, academicYear: '2026-27', totalAmount: 44000, paidAmount: 11000, dueDate: '2026-08-31', status: 'PARTIAL' },
+  ];
+
+  // Per-payment transaction history, mirroring the real backend's `payments` table
+  // (Payment entity + PaymentRepository.findByFeeRecordId already exist server-side,
+  // see backend/docs/FRONTEND_REQUESTED_CHANGES.md — only the controller endpoint is missing).
+  const payments = [
+    { id: 1, feeRecordId: 1, amount: 12000, paymentDate: '2026-06-10T10:00:00Z', method: 'UPI',  reference: 'UPI-TXN-1001', recordedByUserId: 9 },
+    { id: 2, feeRecordId: 2, amount: 24000, paymentDate: '2026-06-12T10:00:00Z', method: 'CARD', reference: 'CARD-TXN-2001', recordedByUserId: 10 },
+    { id: 3, feeRecordId: 3, amount: 11000, paymentDate: '2026-06-15T10:00:00Z', method: 'CASH', reference: '', recordedByUserId: 13 },
   ];
 
   const holidays = [
@@ -275,24 +292,37 @@ function buildSeed() {
     });
   });
 
+  // status: 'draft' (Headmaster working copy) | 'pending_approval' (submitted) | 'approved'
+  // (visible to Student/Teacher read views). Seed data starts pre-approved so existing
+  // read-only views keep working unchanged.
   const timetableSlots = [
-    { id: 1,  classId: 1, teacherStaffId: 3,  dayOfWeek: 'MONDAY',    periodNumber: 1, startTime: '08:00', endTime: '08:45', subject: 'Mathematics' },
-    { id: 2,  classId: 1, teacherStaffId: 4,  dayOfWeek: 'MONDAY',    periodNumber: 2, startTime: '08:45', endTime: '09:30', subject: 'Science' },
-    { id: 3,  classId: 1, teacherStaffId: 5,  dayOfWeek: 'MONDAY',    periodNumber: 3, startTime: '09:30', endTime: '10:15', subject: 'English' },
-    { id: 4,  classId: 1, teacherStaffId: 18, dayOfWeek: 'MONDAY',    periodNumber: 4, startTime: '10:30', endTime: '11:15', subject: 'History' },
-    { id: 5,  classId: 1, teacherStaffId: 19, dayOfWeek: 'MONDAY',    periodNumber: 5, startTime: '11:15', endTime: '12:00', subject: 'Geography' },
-    { id: 6,  classId: 1, teacherStaffId: 4,  dayOfWeek: 'TUESDAY',   periodNumber: 1, startTime: '08:00', endTime: '08:45', subject: 'Science' },
-    { id: 7,  classId: 1, teacherStaffId: 3,  dayOfWeek: 'TUESDAY',   periodNumber: 2, startTime: '08:45', endTime: '09:30', subject: 'Mathematics' },
-    { id: 8,  classId: 1, teacherStaffId: 5,  dayOfWeek: 'TUESDAY',   periodNumber: 3, startTime: '09:30', endTime: '10:15', subject: 'English' },
-    { id: 9,  classId: 1, teacherStaffId: 3,  dayOfWeek: 'WEDNESDAY', periodNumber: 1, startTime: '08:00', endTime: '08:45', subject: 'Mathematics' },
-    { id: 10, classId: 1, teacherStaffId: 18, dayOfWeek: 'WEDNESDAY', periodNumber: 2, startTime: '08:45', endTime: '09:30', subject: 'History' },
-    { id: 11, classId: 1, teacherStaffId: 5,  dayOfWeek: 'THURSDAY',  periodNumber: 1, startTime: '08:00', endTime: '08:45', subject: 'English' },
-    { id: 12, classId: 1, teacherStaffId: 4,  dayOfWeek: 'THURSDAY',  periodNumber: 2, startTime: '08:45', endTime: '09:30', subject: 'Science' },
-    { id: 13, classId: 1, teacherStaffId: 3,  dayOfWeek: 'FRIDAY',    periodNumber: 1, startTime: '08:00', endTime: '08:45', subject: 'Mathematics' },
-    { id: 14, classId: 1, teacherStaffId: 19, dayOfWeek: 'FRIDAY',    periodNumber: 2, startTime: '08:45', endTime: '09:30', subject: 'Geography' },
-    { id: 15, classId: 3, teacherStaffId: 3,  dayOfWeek: 'MONDAY',    periodNumber: 1, startTime: '08:00', endTime: '08:45', subject: 'Mathematics' },
-    { id: 16, classId: 3, teacherStaffId: 5,  dayOfWeek: 'TUESDAY',   periodNumber: 1, startTime: '08:00', endTime: '08:45', subject: 'English' },
+    { id: 1,  classId: 1, teacherStaffId: 3,  dayOfWeek: 'MONDAY',    periodNumber: 1, startTime: '08:00', endTime: '08:45', subject: 'Mathematics', status: 'approved' },
+    { id: 2,  classId: 1, teacherStaffId: 4,  dayOfWeek: 'MONDAY',    periodNumber: 2, startTime: '08:45', endTime: '09:30', subject: 'Science', status: 'approved' },
+    { id: 3,  classId: 1, teacherStaffId: 5,  dayOfWeek: 'MONDAY',    periodNumber: 3, startTime: '09:30', endTime: '10:15', subject: 'English', status: 'approved' },
+    { id: 4,  classId: 1, teacherStaffId: 18, dayOfWeek: 'MONDAY',    periodNumber: 4, startTime: '10:30', endTime: '11:15', subject: 'History', status: 'approved' },
+    { id: 5,  classId: 1, teacherStaffId: 19, dayOfWeek: 'MONDAY',    periodNumber: 5, startTime: '11:15', endTime: '12:00', subject: 'Geography', status: 'approved' },
+    { id: 6,  classId: 1, teacherStaffId: 4,  dayOfWeek: 'TUESDAY',   periodNumber: 1, startTime: '08:00', endTime: '08:45', subject: 'Science', status: 'approved' },
+    { id: 7,  classId: 1, teacherStaffId: 3,  dayOfWeek: 'TUESDAY',   periodNumber: 2, startTime: '08:45', endTime: '09:30', subject: 'Mathematics', status: 'approved' },
+    { id: 8,  classId: 1, teacherStaffId: 5,  dayOfWeek: 'TUESDAY',   periodNumber: 3, startTime: '09:30', endTime: '10:15', subject: 'English', status: 'approved' },
+    { id: 9,  classId: 1, teacherStaffId: 3,  dayOfWeek: 'WEDNESDAY', periodNumber: 1, startTime: '08:00', endTime: '08:45', subject: 'Mathematics', status: 'approved' },
+    { id: 10, classId: 1, teacherStaffId: 18, dayOfWeek: 'WEDNESDAY', periodNumber: 2, startTime: '08:45', endTime: '09:30', subject: 'History', status: 'approved' },
+    { id: 11, classId: 1, teacherStaffId: 5,  dayOfWeek: 'THURSDAY',  periodNumber: 1, startTime: '08:00', endTime: '08:45', subject: 'English', status: 'approved' },
+    { id: 12, classId: 1, teacherStaffId: 4,  dayOfWeek: 'THURSDAY',  periodNumber: 2, startTime: '08:45', endTime: '09:30', subject: 'Science', status: 'approved' },
+    { id: 13, classId: 1, teacherStaffId: 3,  dayOfWeek: 'FRIDAY',    periodNumber: 1, startTime: '08:00', endTime: '08:45', subject: 'Mathematics', status: 'approved' },
+    { id: 14, classId: 1, teacherStaffId: 19, dayOfWeek: 'FRIDAY',    periodNumber: 2, startTime: '08:45', endTime: '09:30', subject: 'Geography', status: 'approved' },
+    { id: 15, classId: 3, teacherStaffId: 3,  dayOfWeek: 'MONDAY',    periodNumber: 1, startTime: '08:00', endTime: '08:45', subject: 'Mathematics', status: 'approved' },
+    { id: 16, classId: 3, teacherStaffId: 5,  dayOfWeek: 'TUESDAY',   periodNumber: 1, startTime: '08:00', endTime: '08:45', subject: 'English', status: 'approved' },
   ];
+
+  // Online exam submissions. Mirrors a future backend ExamAttempt entity —
+  // see backend/docs/FRONTEND_REQUESTED_CHANGES.md. Empty by default; populated
+  // as students start/submit online exams.
+  const examAttempts = [];
+
+  // Per-user notifications (fees reminders, etc). Mirrors the real backend's
+  // Notification entity (userId, message, link, createdAt, readAt), which today
+  // has a read endpoint but no write path at all (see backend TODO doc).
+  const notifications = [];
 
   const messages = [
     { id: 1, fromId: 9,  toId: 3, subject: "Regarding Rahul's Math performance",     body: "Dear Sir, I noticed Rahul's performance in Maths has dropped slightly. Could we schedule a meeting?", date: '2026-07-28', read: false },
@@ -303,7 +333,10 @@ function buildSeed() {
 
   return {
     users, students, staff, classes, exams, homework, notes, results,
-    questionPapers, notices, fees, holidays, attendanceRecords, timetableSlots, messages,
+    questionPapers, notices, fees, payments, holidays, attendanceRecords, timetableSlots, messages,
+    notifications, examAttempts, subjects,
+    schoolInfo: { ...defaultSchoolInfo },
+    counters: { staffSeq: defaultIdFormat.staffStartAt, studentSeq: defaultIdFormat.studentStartAt },
   };
 }
 
@@ -322,14 +355,35 @@ function persist(store) {
 
 let cache = null;
 
+// Bump this whenever buildSeed()'s *shape* changes (a table added/removed/
+// renamed) — not just when a config value changes. Without it, a browser
+// that already cached a store from before the shape change keeps that stale
+// shape (e.g. missing a whole new table) for up to 24h, since the fingerprint
+// below only reflects schoolConfig.js's *content*, not code changes to
+// buildSeed() itself. This was the actual cause of a prior
+// "Cannot read properties of undefined" crash (schoolInfo was added to
+// buildSeed() after some sessions had already cached a store without it).
+const SCHEMA_VERSION = 3;
+
+// A cached store from localStorage is only reused if it's both within the TTL
+// AND was seeded from the same schoolConfig.js content (and schema) as right
+// now — otherwise editing schoolConfig.js, or this file adding a new table,
+// would silently have no effect for up to 24h, defeating the entire point of
+// "configuration, read before load."
+const CONFIG_FINGERPRINT = JSON.stringify({ SCHEMA_VERSION, defaultSchoolInfo, defaultIdFormat, defaultSubjects, defaultClasses });
+
 function ensureStore() {
   if (cache) return cache;
   const existing = readRaw();
-  if (existing && existing.seededAt && Date.now() - existing.seededAt < MOCK_STORE_TTL_MS) {
+  if (
+    existing && existing.seededAt
+    && Date.now() - existing.seededAt < MOCK_STORE_TTL_MS
+    && existing.configFingerprint === CONFIG_FINGERPRINT
+  ) {
     cache = existing;
     return cache;
   }
-  cache = { seededAt: Date.now(), tables: buildSeed() };
+  cache = { seededAt: Date.now(), configFingerprint: CONFIG_FINGERPRINT, tables: buildSeed() };
   persist(cache);
   return cache;
 }
@@ -391,17 +445,94 @@ export function toUsersApiShape(u) {
     email: u.email || '',
     active: true,
     createdAt: u.joinDate || '2020-01-01',
+    gender: u.gender,
+    profileImage: u.profileImage,
   };
 }
 
 // ── Derived domain helpers (mirror what the real backend endpoints return) ──
 
+// Student/Teacher-facing reads: only ever see an approved timetable, matching
+// what the real backend's GET endpoints should enforce once they gain a status
+// concept (see backend/docs/FRONTEND_REQUESTED_CHANGES.md).
 export function deriveClassTimetable(classId) {
-  return listTable('timetableSlots').filter(s => String(s.classId) === String(classId));
+  return listTable('timetableSlots').filter(s => String(s.classId) === String(classId) && s.status === 'approved');
 }
 
 export function deriveTeacherTimetable(teacherStaffId) {
-  return listTable('timetableSlots').filter(s => String(s.teacherStaffId) === String(teacherStaffId));
+  return listTable('timetableSlots').filter(s => String(s.teacherStaffId) === String(teacherStaffId) && s.status === 'approved');
+}
+
+// Headmaster/Principal editor & approvals views need every status, not just approved.
+export function deriveClassTimetableAll(classId) {
+  return listTable('timetableSlots').filter(s => String(s.classId) === String(classId));
+}
+
+export function derivePendingClassIds() {
+  const ids = new Set(
+    listTable('timetableSlots').filter(s => s.status === 'pending_approval').map(s => s.classId),
+  );
+  return [...ids];
+}
+
+export function applySaveTimetableSlot(slot) {
+  const store = ensureStore();
+  if (!store.tables.timetableSlots) store.tables.timetableSlots = [];
+  const list = store.tables.timetableSlots;
+  if (slot.id) {
+    const idx = list.findIndex(s => String(s.id) === String(slot.id));
+    if (idx === -1) return null;
+    // Any edit — even to an already-approved slot — needs re-approval.
+    list[idx] = { ...list[idx], ...slot, status: 'draft', rejectionNote: null };
+    saveStore();
+    return { ...list[idx] };
+  }
+  const created = { id: newLocalId('timetableSlots'), ...slot, status: 'draft' };
+  list.push(created);
+  saveStore();
+  return { ...created };
+}
+
+export function applyDeleteTimetableSlot(id) {
+  return deleteRecord('timetableSlots', id);
+}
+
+export function applySubmitClassTimetable(classId) {
+  const store = ensureStore();
+  const list = store.tables.timetableSlots || [];
+  const now = new Date().toISOString();
+  list.forEach((s, idx) => {
+    if (String(s.classId) === String(classId) && s.status === 'draft') {
+      list[idx] = { ...s, status: 'pending_approval', submittedAt: now };
+    }
+  });
+  saveStore();
+  return deriveClassTimetableAll(classId);
+}
+
+export function applyApproveClassTimetable(classId, approvedByUserId) {
+  const store = ensureStore();
+  const list = store.tables.timetableSlots || [];
+  const now = new Date().toISOString();
+  list.forEach((s, idx) => {
+    if (String(s.classId) === String(classId) && s.status === 'pending_approval') {
+      list[idx] = { ...s, status: 'approved', approvedAt: now, approvedByUserId: approvedByUserId || null };
+    }
+  });
+  saveStore();
+  return deriveClassTimetableAll(classId);
+}
+
+export function applyRejectClassTimetable(classId, note) {
+  const store = ensureStore();
+  const list = store.tables.timetableSlots || [];
+  list.forEach((s, idx) => {
+    if (String(s.classId) === String(classId) && s.status === 'pending_approval') {
+      list[idx] = { ...s, status: 'draft', rejectionNote: note || 'Rejected by Principal' };
+    }
+  });
+  saveStore();
+  return deriveClassTimetableAll(classId);
 }
 
 export function deriveClassAttendance(classId, date) {
@@ -449,7 +580,7 @@ export function deriveStudentFeeStatus(studentId) {
   return { ...rec, feeRecordId: rec.id, pendingAmount: rec.totalAmount - rec.paidAmount };
 }
 
-export function applyPayFee({ feeRecordId, amount, method, reference }) {
+export function applyPayFee({ feeRecordId, amount, method, reference, recordedByUserId }) {
   const store = ensureStore();
   const list = store.tables.fees || [];
   const idx = list.findIndex(r => String(r.id) === String(feeRecordId));
@@ -457,8 +588,26 @@ export function applyPayFee({ feeRecordId, amount, method, reference }) {
   const updated = { ...list[idx], paidAmount: list[idx].paidAmount + Number(amount), lastPaymentMethod: method, lastPaymentReference: reference };
   updated.status = updated.paidAmount >= updated.totalAmount ? 'PAID' : updated.paidAmount > 0 ? 'PARTIAL' : 'PENDING';
   list[idx] = updated;
+
+  if (!store.tables.payments) store.tables.payments = [];
+  store.tables.payments.push({
+    id: newLocalId('payments'),
+    feeRecordId,
+    amount: Number(amount),
+    paymentDate: new Date().toISOString(),
+    method,
+    reference: reference || '',
+    recordedByUserId: recordedByUserId || null,
+  });
+
   saveStore();
   return { ...updated };
+}
+
+export function derivePaymentHistory(feeRecordId) {
+  return listTable('payments')
+    .filter(p => String(p.feeRecordId) === String(feeRecordId))
+    .sort((a, b) => new Date(b.paymentDate) - new Date(a.paymentDate));
 }
 
 export function deriveResultsByStudent(studentId) {
@@ -485,6 +634,235 @@ export function deriveStaffPerformanceReport() {
   const countByRole = {};
   staff.forEach(s => { countByRole[s.staffRole] = (countByRole[s.staffRole] || 0) + 1; });
   return { totalStaff: staff.length, activeStaff: staff.filter(s => s.active).length, countByRole };
+}
+
+// ── Online exams ──────────────────────────────────────────────────────────
+// Question types an online exam can auto-grade without a human. Kept in sync
+// with the restriction QuestionPaperManagement.jsx's editor applies when a
+// paper's deliveryMode is 'online' — Short/Long/plain MatchFollowing stay
+// worksheet-only since grading those needs a person.
+export const ONLINE_GRADABLE_TYPES = ['MCQ', 'TrueFalse', 'FillBlanks', 'MatchFollowingShuffled'];
+
+function gradeFromPercent(pct) {
+  if (pct >= 90) return 'A+';
+  if (pct >= 80) return 'A';
+  if (pct >= 70) return 'B';
+  if (pct >= 60) return 'C';
+  if (pct >= 50) return 'D';
+  return 'F';
+}
+
+// response shapes per type: MCQ/TrueFalse -> the chosen option/answer string;
+// FillBlanks -> free text; MatchFollowingShuffled -> { [pairIndex]: pickedRowIndex }.
+function gradeQuestionResponse(q, response) {
+  if (q.type === 'MCQ' || q.type === 'TrueFalse') {
+    return response === q.answer ? q.marks : 0;
+  }
+  if (q.type === 'FillBlanks') {
+    const norm = (s) => String(s || '').trim().toLowerCase();
+    return norm(response) === norm(q.answer) ? q.marks : 0;
+  }
+  if (q.type === 'MatchFollowingShuffled') {
+    const order = q.shuffledOrder || [];
+    const picks = response || {};
+    let correct = 0;
+    (q.pairs || []).forEach((_, i) => {
+      if (Number(picks[i]) === order.indexOf(i)) correct++;
+    });
+    const total = (q.pairs || []).length || 1;
+    return (q.marks * correct) / total;
+  }
+  return 0; // not an auto-gradable type — shouldn't appear in an online paper at all.
+}
+
+export function deriveAttemptForStudent(paperId, studentId) {
+  return listTable('examAttempts').find(
+    a => String(a.paperId) === String(paperId) && String(a.studentId) === String(studentId),
+  ) || null;
+}
+
+export function applyStartAttempt({ paperId, examId, studentId }) {
+  const existing = deriveAttemptForStudent(paperId, studentId);
+  if (existing) return existing;
+  return insertRecord('examAttempts', {
+    paperId, examId, studentId,
+    startedAt: new Date().toISOString(),
+    submittedAt: null,
+    status: 'in_progress',
+    responses: {},
+    marksObtained: null,
+    maxMarks: null,
+  });
+}
+
+// Grades every auto-gradable question in `paper` against `responses`, finalizes
+// the attempt, and inserts a `results` row via the exact same shape manual
+// marks-entry uses — so it shows up in every role's existing Results view with
+// no extra display code needed.
+export function applySubmitAttempt({ attemptId, paper, responses }) {
+  const store = ensureStore();
+  const list = store.tables.examAttempts || [];
+  const idx = list.findIndex(a => String(a.id) === String(attemptId));
+  if (idx === -1) return null;
+
+  let marksObtained = 0;
+  let maxMarks = 0;
+  (paper.content?.sections || []).forEach(sec => {
+    (sec.questions || []).forEach(q => {
+      if (!ONLINE_GRADABLE_TYPES.includes(q.type)) return;
+      maxMarks += q.marks;
+      marksObtained += gradeQuestionResponse(q, responses[q.id]);
+    });
+  });
+  marksObtained = Math.round(marksObtained * 100) / 100;
+
+  const updatedAttempt = {
+    ...list[idx], status: 'submitted', submittedAt: new Date().toISOString(),
+    responses, marksObtained, maxMarks,
+  };
+  list[idx] = updatedAttempt;
+  saveStore();
+
+  const pct = maxMarks > 0 ? (marksObtained / maxMarks) * 100 : 0;
+  const result = insertRecord('results', {
+    studentId: updatedAttempt.studentId,
+    examId: updatedAttempt.examId,
+    subject: paper.subject,
+    marksObtained,
+    maxMarks,
+    grade: gradeFromPercent(pct),
+    enteredByStaffId: null, // auto-graded — no teacher entered this one
+  });
+
+  return { attempt: { ...updatedAttempt }, result };
+}
+
+// Singleton, not a table — the school's own identity details, editable from
+// the Principal's School Settings screen.
+// Configurable prefix+increasing-number IDs for anyone newly registered
+// through the app (src/config/schoolConfig.js's `defaultIdFormat`).
+export function nextStaffCode() {
+  const store = ensureStore();
+  if (!store.tables.counters) store.tables.counters = { staffSeq: defaultIdFormat.staffStartAt, studentSeq: defaultIdFormat.studentStartAt };
+  const seq = store.tables.counters.staffSeq++;
+  saveStore();
+  return `${defaultIdFormat.staffPrefix}${String(seq).padStart(defaultIdFormat.staffPadLength, '0')}`;
+}
+
+export function nextAdmissionNumber() {
+  const store = ensureStore();
+  if (!store.tables.counters) store.tables.counters = { staffSeq: defaultIdFormat.staffStartAt, studentSeq: defaultIdFormat.studentStartAt };
+  const seq = store.tables.counters.studentSeq++;
+  saveStore();
+  return `${defaultIdFormat.studentPrefix}${String(seq).padStart(defaultIdFormat.studentPadLength, '0')}`;
+}
+
+// ── Bulk student roster, loaded from an editable file ───────────────────────
+// public/students.csv is hand-editable (open it in Excel, edit, save) — the
+// app re-reads it on every boot and replaces whatever it loaded last time, so
+// edits take effect on next refresh. Bulk rows live in a reserved id range
+// (1000+) so this never touches the small hardcoded demo roster (ids < 1000)
+// or anyone registered manually through the app (those get string ids like
+// "local-users-...", never a plain integer, so they're never mistaken for a
+// bulk row either).
+const BULK_STUDENT_ID_START = 1000;
+const BULK_ADMISSION_BASE = 5000; // separate from the live nextAdmissionNumber() counter so bulk admission numbers stay stable across reloads instead of drifting upward every refresh.
+
+function isBulkStudentId(id) {
+  const n = Number(id);
+  return Number.isInteger(n) && n >= BULK_STUDENT_ID_START;
+}
+
+function classIdFor(gradeLevel, section) {
+  const idx = defaultClasses.findIndex(c => c.gradeLevel === gradeLevel && c.section === section);
+  return idx === -1 ? null : idx + 1;
+}
+
+function parseStudentsCsv(text) {
+  const lines = text.trim().split(/\r?\n/);
+  if (lines.length < 2) return [];
+  const header = lines[0].split(',').map(h => h.trim());
+  return lines.slice(1).filter(Boolean).map(line => {
+    const cells = line.split(',');
+    const row = {};
+    header.forEach((key, i) => { row[key] = (cells[i] || '').trim(); });
+    return row;
+  });
+}
+
+// Awaited once at app boot (see src/index.js), before the app renders, so
+// every component sees the final roster on first paint rather than a
+// demo-only list that silently grows after a background fetch resolves.
+export async function preloadBulkStudentsFromCsv() {
+  const store = ensureStore();
+  try {
+    const res = await fetch('/students.csv');
+    if (!res.ok) return;
+    const rows = parseStudentsCsv(await res.text());
+    if (rows.length === 0) return;
+
+    store.tables.students = (store.tables.students || []).filter(s => !isBulkStudentId(s.id));
+    store.tables.users = (store.tables.users || []).filter(u => !isBulkStudentId(u.id));
+
+    rows.forEach((row, i) => {
+      const id = BULK_STUDENT_ID_START + i;
+      const admissionNumber = `${defaultIdFormat.studentPrefix}${String(BULK_ADMISSION_BASE + i).padStart(defaultIdFormat.studentPadLength, '0')}`;
+      const classId = classIdFor(Number(row.gradeLevel), row.section);
+
+      store.tables.users.push({
+        id,
+        username: admissionNumber.toLowerCase(),
+        password: 'student123',
+        role: 'student',
+        name: `${row.firstName} ${row.lastName}`,
+        avatar: `${(row.firstName || '')[0] || ''}${(row.lastName || '')[0] || ''}`.toUpperCase(),
+        gender: row.gender || '',
+        profileImage: null,
+      });
+      store.tables.students.push({
+        id, userId: id,
+        firstName: row.firstName, lastName: row.lastName,
+        admissionNumber, classId,
+        dateOfBirth: row.dateOfBirth || null,
+        gender: row.gender || '',
+        guardianName: row.guardianName || '',
+        guardianPhone: row.guardianPhone || '',
+        bloodGroup: row.bloodGroup || '',
+        parentUserId: null,
+        profileImage: null,
+        active: true,
+      });
+    });
+
+    saveStore();
+  } catch {
+    // No CSV reachable (e.g. not served from /public in this environment) —
+    // the small hardcoded demo roster from buildSeed() is still there.
+  }
+}
+
+export function deriveSchoolInfo() {
+  // Defaults first, then whatever's actually persisted — so a cache that's
+  // somehow still missing this (schema drift the fingerprint above didn't
+  // catch) degrades to defaults instead of crashing every reader downstream.
+  return { ...defaultSchoolInfo, ...ensureStore().tables.schoolInfo };
+}
+
+export function applyUpdateSchoolInfo(patch) {
+  const store = ensureStore();
+  store.tables.schoolInfo = { ...defaultSchoolInfo, ...store.tables.schoolInfo, ...patch };
+  saveStore();
+  return { ...store.tables.schoolInfo };
+}
+
+export function deriveNotificationsForUser(userId) {
+  return listTable('notifications')
+    .filter(n => String(n.userId) === String(userId))
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+}
+
+export function applyCreateNotification({ userId, message, link }) {
+  return insertRecord('notifications', { userId, message, link: link || '', createdAt: new Date().toISOString(), readAt: null });
 }
 
 export function deriveAnalytics() {

@@ -1,13 +1,12 @@
 import { useState } from 'react';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
-
-const SUBJECTS = ['Mathematics', 'Science', 'English', 'History', 'Geography', 'Computer', 'PE', 'Drawing'];
+import { errorText } from '../../utils/apiError';
 
 const BLANK = { classId: '', subject: '', title: '', fileUrl: '' };
 
 export default function NotesManagement() {
-  const { notes, addNote, classes } = useData();
+  const { notes, addNote, classes, subjects } = useData();
   const { currentUser } = useAuth();
   const isTeacher = currentUser?.role === 'teacher';
 
@@ -26,6 +25,7 @@ export default function NotesManagement() {
 
   const submit = async () => {
     if (!form.title.trim() || !form.classId || !form.subject) return;
+    if (!form.fileUrl.trim()) { setSubmitError('A file URL is required.'); return; }
     setSubmitting(true);
     setSubmitError('');
     try {
@@ -34,10 +34,11 @@ export default function NotesManagement() {
         subject: form.subject,
         title:   form.title,
         fileUrl: form.fileUrl,
+        uploadedByStaffId: currentUser?.staffId,
       });
       reset();
     } catch (err) {
-      setSubmitError(err.message || 'Failed to upload material');
+      setSubmitError(errorText(err, 'Failed to upload material'));
     } finally {
       setSubmitting(false);
     }
@@ -85,11 +86,11 @@ export default function NotesManagement() {
                 <label className="form-label">Subject *</label>
                 <select className="form-control" value={form.subject} onChange={e => set('subject', e.target.value)}>
                   <option value="">Select…</option>
-                  {SUBJECTS.map(s => <option key={s} value={s}>{s}</option>)}
+                  {subjects.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
                 </select>
               </div>
               <div className="form-group">
-                <label className="form-label">File URL</label>
+                <label className="form-label">File URL *</label>
                 <input className="form-control" value={form.fileUrl} onChange={e => set('fileUrl', e.target.value)} placeholder="https://…" />
               </div>
             </div>

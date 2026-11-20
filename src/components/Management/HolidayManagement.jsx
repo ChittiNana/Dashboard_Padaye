@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useData } from '../../context/DataContext';
+import EventCalendar from '../Shared/EventCalendar';
 
 const BLANK = { date: '', name: '', type: 'National', description: '' };
 const BADGE_MAP = { National: 'badge-danger', Festival: 'badge-warning', Regional: 'badge-purple' };
@@ -35,6 +36,8 @@ export default function HolidayManagement({ canEdit = false }) {
           </button>
         )}
       </div>
+
+      <EventCalendar events={holidays} title="Holiday Calendar" />
 
       {showForm && canEdit && (
         <div className="card mb-20">

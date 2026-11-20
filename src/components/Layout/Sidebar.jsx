@@ -1,4 +1,6 @@
 import { useAuth } from '../../context/AuthContext';
+import { useData } from '../../context/DataContext';
+import ProfileAvatar from '../Shared/ProfileAvatar';
 
 const navConfig = {
   principal: [
@@ -11,12 +13,15 @@ const navConfig = {
       { id: 'staff',           icon: '👔', label: 'Staff'              },
       { id: 'students',        icon: '👩‍🎓', label: 'All Students'    },
       { id: 'classes',         icon: '🏫', label: 'Classes'            },
+      { id: 'subjects',        icon: '📘', label: 'Subjects'           },
       { id: 'fees',            icon: '💰', label: 'Fees & Finance'     },
+      { id: 'school-settings', icon: '⚙️', label: 'School Settings'    },
     ]},
     { section: 'Academic', items: [
       { id: 'exams',           icon: '📋', label: 'Exam Management'    },
       { id: 'question-papers', icon: '📝', label: 'Question Papers'    },
       { id: 'attendance',      icon: '✅', label: 'Attendance'         },
+      { id: 'timetable-approvals', icon: '🕐', label: 'Timetable Approvals' },
       { id: 'holidays',        icon: '🗓', label: 'Holiday Calendar'   },
     ]},
     { section: 'Communication', items: [
@@ -100,6 +105,7 @@ const navConfig = {
     ]},
     { section: 'Exams', items: [
       { id: 'exams',       icon: '📋', label: 'Exam Schedule'   },
+      { id: 'take-exam',   icon: '📝', label: 'Take Exam'       },
       { id: 'papers',      icon: '📄', label: 'Past Papers'     },
       { id: 'results',     icon: '🏆', label: 'My Results'      },
     ]},
@@ -139,9 +145,13 @@ const navConfig = {
 
 export default function Sidebar({ activeTab, onTabChange, collapsed, onCollapse }) {
   const { currentUser, logout } = useAuth();
+  const { messages } = useData();
   const role = currentUser?.role || 'guest';
   const sections = navConfig[role] || navConfig.guest;
   const avatarRole = ['accountant', 'support_staff'].includes(role) ? 'teacher' : role;
+  const unreadMessages = messages.filter(m => m.toId === currentUser?.id && !m.read).length;
+
+  const badgeFor = (item) => (item.id === 'messages' ? (unreadMessages > 0 ? String(unreadMessages) : null) : item.badge);
 
   return (
     <aside className={`sidebar ${collapsed ? 'collapsed' : ''}`}>
@@ -170,8 +180,8 @@ export default function Sidebar({ activeTab, onTabChange, collapsed, onCollapse 
               >
                 <span className="sidebar-item-icon">{item.icon}</span>
                 <span className="sidebar-item-label">{item.label}</span>
-                {item.badge && (
-                  <span className="sidebar-badge">{item.badge}</span>
+                {badgeFor(item) && (
+                  <span className="sidebar-badge">{badgeFor(item)}</span>
                 )}
               </div>
             ))}
@@ -182,9 +192,7 @@ export default function Sidebar({ activeTab, onTabChange, collapsed, onCollapse 
       {/* Footer */}
       <div className="sidebar-footer">
         <div className="sidebar-user-card" onClick={logout}>
-          <span className={`avatar avatar-sm role-${avatarRole}`}>
-            {currentUser?.avatar?.slice(0, 2) || 'GU'}
-          </span>
+          <ProfileAvatar image={currentUser?.profileImage} gender={currentUser?.gender} role={avatarRole} size={28} />
           {!collapsed && (
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 12, fontWeight: 600, color: '#e2e8f0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>

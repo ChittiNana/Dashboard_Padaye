@@ -1,13 +1,12 @@
 import { useState } from 'react';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
-
-const SUBJECTS = ['Mathematics', 'Science', 'English', 'History', 'Geography', 'Computer', 'PE', 'Drawing'];
+import { errorText } from '../../utils/apiError';
 
 const BLANK = { classId: '', subject: '', title: '', dueDate: '', description: '' };
 
 export default function HomeworkManagement() {
-  const { homework, addHomework, classes } = useData();
+  const { homework, addHomework, classes, subjects } = useData();
   const { currentUser } = useAuth();
   const isTeacher = currentUser?.role === 'teacher';
 
@@ -36,10 +35,11 @@ export default function HomeworkManagement() {
         title:       form.title,
         description: form.description,
         dueDate:     form.dueDate,
+        createdByStaffId: currentUser?.staffId,
       });
       reset();
     } catch (err) {
-      setSubmitError(err.message || 'Failed to create assignment');
+      setSubmitError(errorText(err, 'Failed to create assignment'));
     } finally {
       setSubmitting(false);
     }
@@ -96,7 +96,7 @@ export default function HomeworkManagement() {
                 <label className="form-label">Subject *</label>
                 <select className="form-control" value={form.subject} onChange={e => set('subject', e.target.value)}>
                   <option value="">Select…</option>
-                  {SUBJECTS.map(s => <option key={s} value={s}>{s}</option>)}
+                  {subjects.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
                 </select>
               </div>
               <div className="form-group">

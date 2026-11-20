@@ -6,6 +6,8 @@ import * as timetableApi from '../../api/timetableApi';
 import * as academicsApi from '../../api/academicsApi';
 import { readWithFallback } from '../../api/mockFallback';
 import { listTable, deriveStudentAttendance, deriveResultsByStudent, deriveClassTimetable } from '../../data/mockStore';
+import EventCalendar from '../Shared/EventCalendar';
+import TakeExam from '../Exams/TakeExam';
 
 const DAY_ORDER = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
 
@@ -728,6 +730,8 @@ function HolidayList() {
         </div>
       </div>
 
+      <EventCalendar events={holidays} title="Calendar" />
+
       <div className="dashboard-grid grid-2">
         <div className="card col-span-2">
           <div className="table-wrapper">
@@ -797,6 +801,7 @@ export default function StudentDashboard({ activeTab }) {
     notes:      <StudyMaterials student={student} />,
     homework:   <Homework student={student} />,
     exams:      <ExamSchedule student={student} />,
+    'take-exam': <TakeExam />,
     papers:     <PastPapers student={student} />,
     results:    <Results student={student} />,
     attendance: <AttendanceView student={student} />,

@@ -4,8 +4,11 @@ import * as classesApi from '../api/classesApi';
 import * as academicsApi from '../api/academicsApi';
 import * as feeApi from '../api/feeApi';
 import * as communicationApi from '../api/communicationApi';
-import { readWithFallback, writeThroughMock } from '../api/mockFallback';
-import { listTable, insertRecord, updateRecord, deleteRecord, applyPayFee } from '../data/mockStore';
+import * as configApi from '../api/configApi';
+import { readWithFallback, writeThroughMock, writeWithApi } from '../api/mockFallback';
+import { listTable, insertRecord, updateRecord, deleteRecord, applyPayFee, deriveSchoolInfo, applyUpdateSchoolInfo } from '../data/mockStore';
+import { errorText } from '../utils/apiError';
+import { defaultSchoolInfo } from '../config/schoolConfig';
 
 const DataContext = createContext(null);
 
@@ -29,6 +32,30 @@ export function DataProvider({ children }) {
   const [results,        setResults]        = useState([]);
   const [messages,       setMessages]       = useState([]);
   const [directoryUsers, setDirectoryUsers] = useState([]);
+  const [subjects,       setSubjects]       = useState([]);
+  const [schoolInfo,     setSchoolInfo]     = useState(defaultSchoolInfo);
+
+  // ── School info (public — needed on the pre-login Login/Guest screens too) ──
+  useEffect(() => {
+    let active = true;
+    readWithFallback(
+      () => configApi.getSchoolInfo(),
+      () => deriveSchoolInfo(),
+      { label: 'getSchoolInfo' },
+    ).then(info => { if (active) setSchoolInfo(info); });
+    return () => { active = false; };
+  }, []);
+
+  const updateSchoolInfo = async (patch) => {
+    const { result, real } = await writeWithApi(
+      () => configApi.updateSchoolInfo(patch),
+      () => applyUpdateSchoolInfo(patch),
+      { label: 'updateSchoolInfo' },
+    );
+    const updated = real ? { ...patch, ...(result || {}) } : result;
+    setSchoolInfo(updated);
+    return updated;
+  };
 
   // ── Classes ──────────────────────────────────────────────────────────────────
   const loadClasses = useCallback(async () => {
@@ -45,74 +72,101 @@ export function DataProvider({ children }) {
 
   useEffect(() => { loadClasses(); }, [loadClasses]);
 
-  const addClass = (d) => writeThroughMock(
-    () => {
-      const created = insertRecord('classes', {
+  // ── Subjects (school-wide static config — visible to any signed-in role) ─────
+  const loadSubjects = useCallback(async () => {
+    if (!currentUser) { setSubjects([]); return; }
+    setSubjects(await readWithFallback(
+      () => configApi.listSubjects(),
+      () => listTable('subjects'),
+      { label: 'listSubjects' },
+    ));
+  }, [currentUser]);
+
+  useEffect(() => { loadSubjects(); }, [loadSubjects]);
+
+  const addSubject = async (name) => {
+    const { result } = await writeWithApi(
+      () => configApi.createSubject({ name }),
+      () => insertRecord('subjects', { name }),
+      { label: 'addSubject' },
+    );
+    setSubjects(p => [...p, result]);
+    return result;
+  };
+
+  const deleteSubject = async (id) => {
+    await writeWithApi(
+      () => configApi.deleteSubject(id),
+      () => deleteRecord('subjects', id),
+      { label: 'deleteSubject' },
+    );
+    setSubjects(p => p.filter(s => s.id !== id));
+    return true;
+  };
+
+  const addClass = async (d) => {
+    const gradeLevel = Number(d.grade);
+    if (!Number.isFinite(gradeLevel) || gradeLevel < 1) throw new Error('Grade level must be 1 or higher.');
+    if (!String(d.section ?? '').trim()) throw new Error('Section is required.');
+    const { result } = await writeWithApi(
+      () => classesApi.createClass({
         name: d.name,
         gradeLevel: d.grade,
         section: d.section,
         classTeacherStaffId: d.classTeacherId || null,
+        feeAmount: d.feeAmount != null ? Number(d.feeAmount) : null,
+      }),
+      () => insertRecord('classes', {
+        name: d.name,
+        gradeLevel: d.grade,
+        section: d.section,
+        classTeacherStaffId: d.classTeacherId || null,
+        feeAmount: d.feeAmount != null ? Number(d.feeAmount) : null,
         active: true,
-      });
-      setClasses(p => [...p, created]);
-      return created;
-    },
-    () => classesApi.createClass({
-      name: d.name,
-      gradeLevel: d.grade,
-      section: d.section,
-      classTeacherStaffId: d.classTeacherId || null,
-    }),
-    { label: 'addClass' },
-  );
+      }),
+      { label: 'addClass' },
+    );
+    setClasses(p => [...p, result]);
+    return result;
+  };
 
-  const updateClass = (id, d) => writeThroughMock(
-    () => {
-      const current = classes.find(c => c.id === id);
-      const updated = updateRecord('classes', id, {
-        name: d.name ?? current?.name,
-        gradeLevel: d.grade ?? current?.gradeLevel,
-        section: d.section ?? current?.section,
-        classTeacherStaffId: (d.classTeacherId ?? current?.classTeacherStaffId) || null,
-        active: d.active ?? current?.active ?? true,
-      });
-      setClasses(p => p.map(c => c.id === id ? updated : c));
-      return updated;
-    },
-    () => {
-      const current = classes.find(c => c.id === id);
-      return classesApi.updateClass(id, {
-        name: d.name ?? current?.name,
-        gradeLevel: d.grade ?? current?.gradeLevel,
-        section: d.section ?? current?.section,
-        classTeacherStaffId: (d.classTeacherId ?? current?.classTeacherStaffId) || null,
-        active: d.active ?? current?.active ?? true,
-      });
-    },
-    { label: 'updateClass' },
-  );
+  const updateClass = async (id, d) => {
+    const current = classes.find(c => c.id === id);
+    const body = {
+      name: d.name ?? current?.name,
+      gradeLevel: d.grade ?? current?.gradeLevel,
+      section: d.section ?? current?.section,
+      classTeacherStaffId: (d.classTeacherId ?? current?.classTeacherStaffId) || null,
+      feeAmount: d.feeAmount != null ? Number(d.feeAmount) : (current?.feeAmount ?? null),
+      active: d.active ?? current?.active ?? true,
+    };
+    const { result } = await writeWithApi(
+      () => classesApi.updateClass(id, body),
+      () => updateRecord('classes', id, body),
+      { label: 'updateClass' },
+    );
+    setClasses(p => p.map(c => c.id === id ? result : c));
+    return result;
+  };
 
-  const deleteClass = (id) => writeThroughMock(
-    () => {
-      const current = classes.find(c => c.id === id);
-      if (!current) return null;
-      const updated = updateRecord('classes', id, { active: false });
-      setClasses(p => p.map(c => c.id === id ? updated : c));
-      return updated;
-    },
-    () => {
-      const current = classes.find(c => c.id === id);
-      if (!current) return null;
-      return classesApi.updateClass(id, {
+  const deleteClass = async (id) => {
+    const current = classes.find(c => c.id === id);
+    if (!current) return null;
+    const { result } = await writeWithApi(
+      () => classesApi.updateClass(id, {
         name: current.name,
         gradeLevel: current.gradeLevel,
         section: current.section,
         classTeacherStaffId: current.classTeacherStaffId,
+        feeAmount: current.feeAmount,
         active: false,
-      });
-    },
-    { label: 'deleteClass' },
-  );
+      }),
+      () => updateRecord('classes', id, { active: false }),
+      { label: 'deleteClass' },
+    );
+    setClasses(p => p.map(c => c.id === id ? result : c));
+    return result;
+  };
 
   // ── Exams ─────────────────────────────────────────────────────────────────────
   const loadExams = useCallback(async () => {
@@ -129,15 +183,16 @@ export function DataProvider({ children }) {
 
   useEffect(() => { loadExams(); }, [loadExams]);
 
-  const addExam = (d) => writeThroughMock(
-    () => {
-      const created = insertRecord('exams', d);
-      setExams(p => [...p, created]);
-      return created;
-    },
-    () => academicsApi.createExam(d),
-    { label: 'addExam' },
-  );
+  const addExam = async (d) => {
+    if (!(Number(d.maxMarks) > 0)) throw new Error('Max marks must be greater than 0.');
+    const { result } = await writeWithApi(
+      () => academicsApi.createExam(d),
+      () => insertRecord('exams', d),
+      { label: 'addExam' },
+    );
+    setExams(p => [...p, result]);
+    return result;
+  };
 
   // ── Announcements ─────────────────────────────────────────────────────────────
   const loadAnnouncements = useCallback(async () => {
@@ -154,32 +209,38 @@ export function DataProvider({ children }) {
 
   useEffect(() => { loadAnnouncements(); }, [loadAnnouncements]);
 
-  const addAnnouncement = (d) => writeThroughMock(
-    () => {
-      const created = insertRecord('notices', d);
-      setAnnouncements(p => [created, ...p]);
-      return created;
-    },
-    () => communicationApi.createNotice(d),
-    { label: 'addAnnouncement' },
-  );
-  const updateAnnouncement = (id, d) => writeThroughMock(
-    () => {
-      const updated = updateRecord('notices', id, d);
-      setAnnouncements(p => p.map(a => a.id === id ? updated : a));
-      return updated;
-    },
-    () => communicationApi.updateNotice(id, d),
-    { label: 'updateAnnouncement' },
-  );
-  const deleteAnnouncement = (id) => writeThroughMock(
-    () => {
-      deleteRecord('notices', id);
+  const addAnnouncement = async (d) => {
+    try {
+      const { result } = await writeWithApi(
+        () => communicationApi.createNotice(d),
+        () => insertRecord('notices', d),
+        { label: 'addAnnouncement' },
+      );
+      setAnnouncements(p => [result, ...p]);
+      return result;
+    } catch (err) { throw new Error(errorText(err, 'Failed to save notice.')); }
+  };
+  const updateAnnouncement = async (id, d) => {
+    try {
+      const { result } = await writeWithApi(
+        () => communicationApi.updateNotice(id, d),
+        () => updateRecord('notices', id, d),
+        { label: 'updateAnnouncement' },
+      );
+      setAnnouncements(p => p.map(a => a.id === id ? result : a));
+      return result;
+    } catch (err) { throw new Error(errorText(err, 'Failed to save notice.')); }
+  };
+  const deleteAnnouncement = async (id) => {
+    try {
+      await writeWithApi(
+        () => communicationApi.deleteNotice(id),
+        () => deleteRecord('notices', id),
+        { label: 'deleteAnnouncement' },
+      );
       setAnnouncements(p => p.filter(a => a.id !== id));
-    },
-    () => communicationApi.deleteNotice(id),
-    { label: 'deleteAnnouncement' },
-  );
+    } catch (err) { throw new Error(errorText(err, 'Failed to delete notice.')); }
+  };
 
   // ── Holidays (client-side only — no backend module exists) ───────────────────
   useEffect(() => { setHolidays(listTable('holidays')); }, []);
@@ -245,24 +306,50 @@ export function DataProvider({ children }) {
 
   useEffect(() => { loadFees(); }, [loadFees]);
 
-  const payFee = (d) => writeThroughMock(
-    () => {
-      const updated = applyPayFee(d);
-      if (updated) setFees(p => p.map(f => f.id === updated.id ? updated : f));
-      return updated;
-    },
-    () => feeApi.payFee(d),
-    { label: 'payFee' },
-  );
-  const updateFeeRecord = (id, d) => writeThroughMock(
-    () => {
-      const updated = updateRecord('fees', id, d);
-      setFees(p => p.map(f => f.id === id ? updated : f));
-      return updated;
-    },
-    () => feeApi.updateFeeRecord(id, d),
-    { label: 'updateFeeRecord' },
-  );
+  const addFeeRecord = async (d) => {
+    const body = { ...d, totalAmount: Math.round(Number(d.totalAmount) * 100) / 100 };
+    try {
+      const { result } = await writeWithApi(
+        () => feeApi.createFeeRecord(body),
+        () => insertRecord('fees', {
+          studentId: body.studentId,
+          academicYear: body.academicYear,
+          totalAmount: body.totalAmount,
+          paidAmount: 0,
+          dueDate: body.dueDate,
+          status: 'PENDING',
+        }),
+        { label: 'addFeeRecord' },
+      );
+      setFees(p => [...p, result]);
+      return result;
+    } catch (err) { throw new Error(errorText(err, 'Failed to create fee record.')); }
+  };
+
+  // idempotencyKey: one key per payment attempt (reuse it when retrying the same attempt).
+  const payFee = async (d, idempotencyKey) => {
+    try {
+      const { result, real } = await writeWithApi(
+        () => feeApi.payFee(d, idempotencyKey),
+        () => applyPayFee(d),
+        { label: 'payFee' },
+      );
+      if (real) await loadFees(); // balances/status come from the server
+      else if (result) setFees(p => p.map(f => f.id === result.id ? result : f));
+      return result;
+    } catch (err) { throw new Error(errorText(err, 'Payment failed.')); }
+  };
+  const updateFeeRecord = async (id, d) => {
+    try {
+      const { result } = await writeWithApi(
+        () => feeApi.updateFeeRecord(id, d),
+        () => updateRecord('fees', id, d),
+        { label: 'updateFeeRecord' },
+      );
+      setFees(p => p.map(f => f.id === id ? result : f));
+      return result;
+    } catch (err) { throw new Error(errorText(err, 'Update failed.')); }
+  };
 
   // ── Homework ──────────────────────────────────────────────────────────────────
   const loadHomework = useCallback(async () => {
@@ -279,15 +366,18 @@ export function DataProvider({ children }) {
 
   useEffect(() => { loadHomework(); }, [loadHomework]);
 
-  const addHomework = (d) => writeThroughMock(
-    () => {
-      const created = insertRecord('homework', d);
-      setHomework(p => [...p, created]);
-      return created;
-    },
-    () => academicsApi.createHomework(d),
-    { label: 'addHomework' },
-  );
+  const addHomework = async (d) => {
+    // createdByStaffId is set by the backend from the signed-in user; only the local mock needs it.
+    // eslint-disable-next-line no-unused-vars
+    const { createdByStaffId, ...apiBody } = d;
+    const { result } = await writeWithApi(
+      () => academicsApi.createHomework(apiBody),
+      () => insertRecord('homework', d),
+      { label: 'addHomework' },
+    );
+    setHomework(p => [...p, result]);
+    return result;
+  };
 
   // ── Notes ─────────────────────────────────────────────────────────────────────
   const loadNotes = useCallback(async () => {
@@ -304,15 +394,16 @@ export function DataProvider({ children }) {
 
   useEffect(() => { loadNotes(); }, [loadNotes]);
 
-  const addNote = (d) => writeThroughMock(
-    () => {
-      const created = insertRecord('notes', d);
-      setNotes(p => [...p, created]);
-      return created;
-    },
-    () => academicsApi.createNote(d),
-    { label: 'addNote' },
-  );
+  const addNote = async (d) => {
+    if (!String(d.fileUrl ?? '').trim()) throw new Error('A file URL is required.');
+    const { result } = await writeWithApi(
+      () => academicsApi.createNote(d),
+      () => insertRecord('notes', d),
+      { label: 'addNote' },
+    );
+    setNotes(p => [...p, result]);
+    return result;
+  };
 
   // ── Results ───────────────────────────────────────────────────────────────────
   const loadResults = useCallback(async () => {
@@ -329,25 +420,27 @@ export function DataProvider({ children }) {
 
   useEffect(() => { loadResults(); }, [loadResults]);
 
-  const addResult = (d) => writeThroughMock(
-    () => {
-      const created = insertRecord('results', d);
-      setResults(p => [...p, created]);
-      return created;
-    },
-    () => academicsApi.createResult(d),
-    { label: 'addResult' },
-  );
+  const addResult = async (d) => {
+    const { result } = await writeWithApi(
+      () => academicsApi.createResult(d),
+      () => insertRecord('results', d),
+      { label: 'addResult' },
+    );
+    setResults(p => [...p, result]);
+    return result;
+  };
 
   return (
     <DataContext.Provider value={{
-      classes, exams, announcements, holidays, fees,
-      homework, notes, results, messages, directoryUsers,
+      classes, exams, announcements, holidays, fees, schoolInfo,
+      homework, notes, results, messages, directoryUsers, subjects,
       addClass, updateClass, deleteClass,
+      addSubject, deleteSubject,
+      updateSchoolInfo,
       addExam,
       addAnnouncement, updateAnnouncement, deleteAnnouncement,
       addHoliday, deleteHoliday,
-      payFee, updateFeeRecord,
+      addFeeRecord, payFee, updateFeeRecord,
       addHomework,
       addNote,
       addResult,

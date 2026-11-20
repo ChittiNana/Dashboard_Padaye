@@ -1,6 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
+import * as notificationsApi from '../../api/notificationsApi';
+import { readWithFallback } from '../../api/mockFallback';
+import { deriveNotificationsForUser } from '../../data/mockStore';
+import ProfileAvatar from '../Shared/ProfileAvatar';
 
 const pageTitles = {
   dashboard:  'Dashboard',
@@ -8,6 +12,8 @@ const pageTitles = {
   staff:      'Staff Management',
   students:   'Students',
   classes:    'Classes',
+  subjects:   'Subjects',
+  'school-settings': 'School Settings',
   fees:       'Fees & Finance',
   exams:      'Exams',
   attendance: 'Attendance',
@@ -22,6 +28,7 @@ const pageTitles = {
   gradebook:  'Grade Book',
   papers:     'Past Papers',
   results:    'Results',
+  'take-exam': 'Take Exam',
   contact:    'Contact Teacher',
   home:       'School Information',
   calendar:   'Academic Calendar',
@@ -31,7 +38,24 @@ export default function Navbar({ activeTab, onToggleSidebar }) {
   const { currentUser, logout } = useAuth();
   const { announcements } = useData();
   const [showNotif, setShowNotif] = useState(false);
-  const unreadCount = announcements.length;
+  const [personalNotifs, setPersonalNotifs] = useState([]);
+
+  useEffect(() => {
+    if (!currentUser?.id) { setPersonalNotifs([]); return; }
+    readWithFallback(
+      () => notificationsApi.listForUser(currentUser.id),
+      () => deriveNotificationsForUser(currentUser.id),
+      { label: 'listNotificationsForUser' },
+    ).then(setPersonalNotifs);
+  }, [currentUser?.id]);
+
+  const feed = [
+    ...personalNotifs.map(n => ({ id: `n-${n.id}`, icon: '💰', title: n.message, date: n.createdAt, color: 'bg-orange' })),
+    ...announcements.map(a => ({ id: `a-${a.id}`, icon: '📢', title: a.title, date: a.createdAt, color: 'bg-teal' })),
+  ].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  // Unread = personal notifications without readAt (absent field counts as unread) plus announcements.
+  const unreadCount = personalNotifs.filter(n => n.readAt == null).length + announcements.length;
 
   return (
     <header className="navbar">
@@ -71,18 +95,18 @@ export default function Navbar({ activeTab, onToggleSidebar }) {
               Notifications
             </div>
             <div style={{ maxHeight: 320, overflowY: 'auto' }}>
-              {announcements.slice(0, 5).map(a => (
-                <div key={a.id} className="notif-item" style={{ padding: '10px 16px' }}>
-                  <div className="notif-icon bg-teal">
-                    📢
+              {feed.slice(0, 5).map(f => (
+                <div key={f.id} className="notif-item" style={{ padding: '10px 16px' }}>
+                  <div className={`notif-icon ${f.color}`}>
+                    {f.icon}
                   </div>
                   <div className="notif-body">
-                    <div className="notif-title">{a.title}</div>
-                    <div className="notif-meta">{a.createdAt ? new Date(a.createdAt).toLocaleDateString() : '—'}</div>
+                    <div className="notif-title">{f.title}</div>
+                    <div className="notif-meta">{f.date ? new Date(f.date).toLocaleDateString() : '—'}</div>
                   </div>
                 </div>
               ))}
-              {announcements.length === 0 && (
+              {feed.length === 0 && (
                 <div style={{ padding: '16px', fontSize: 12, color: 'var(--text-muted)', textAlign: 'center' }}>
                   No notifications.
                 </div>
@@ -101,9 +125,7 @@ export default function Navbar({ activeTab, onToggleSidebar }) {
       {/* User */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}
         onClick={logout} title="Click to logout">
-        <span className={`avatar role-${currentUser?.role}`}>
-          {currentUser?.avatar?.slice(0, 2) || 'GU'}
-        </span>
+        <ProfileAvatar image={currentUser?.profileImage} gender={currentUser?.gender} role={currentUser?.role} size={36} />
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           <span style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.2 }}>
             {currentUser?.name?.split(' ').slice(0, 2).join(' ')}
