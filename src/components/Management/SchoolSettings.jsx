@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useData } from '../../context/DataContext';
 import { errorText } from '../../utils/apiError';
+import { naCount } from '../../utils/display';
 
 const FIELDS = [
   { key: 'name', label: 'School Name', required: true },
@@ -35,7 +36,9 @@ export default function SchoolSettings() {
     setSaving(true);
     setError('');
     try {
-      await updateSchoolInfo(form);
+      // eslint-disable-next-line no-unused-vars
+      const { totalStudents, totalStaff, totalClasses, ...payload } = form;
+      await updateSchoolInfo(payload);
       setSaved(true);
     } catch (err) {
       setError(errorText(err, 'Failed to save school settings'));
@@ -50,6 +53,7 @@ export default function SchoolSettings() {
         <div className="page-header-left">
           <h1>School Settings</h1>
           <p>Identity details shown on the login screen, public pages, and printed documents</p>
+          <p>Students: {naCount(schoolInfo.totalStudents)} · Staff: {naCount(schoolInfo.totalStaff)} · Classes: {naCount(schoolInfo.totalClasses)}</p>
         </div>
       </div>
 

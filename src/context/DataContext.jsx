@@ -5,12 +5,19 @@ import * as academicsApi from '../api/academicsApi';
 import * as feeApi from '../api/feeApi';
 import * as communicationApi from '../api/communicationApi';
 import * as configApi from '../api/configApi';
+import * as countsApi from '../api/countsApi';
 import { readWithFallback, writeThroughMock, writeWithApi } from '../api/mockFallback';
-import { listTable, insertRecord, updateRecord, deleteRecord, applyPayFee, deriveSchoolInfo, applyUpdateSchoolInfo } from '../data/mockStore';
+import { listTable, insertRecord, updateRecord, deleteRecord, applyPayFee, applyUpdateSchoolInfo } from '../data/mockStore';
 import { errorText } from '../utils/apiError';
-import { defaultSchoolInfo } from '../config/schoolConfig';
 
 const DataContext = createContext(null);
+
+// Live school info: every field is null until loaded from the backend (UI shows 'N/A').
+const EMPTY_SCHOOL_INFO = {
+  name: null, established: null, address: null, phone: null, email: null, website: null,
+  affiliation: null, motto: null, principalName: null,
+  totalStudents: null, totalStaff: null, totalClasses: null,
+};
 
 const CLASSES_VISIBLE_ROLES   = ['principal', 'headmaster', 'teacher', 'accountant', 'support_staff'];
 const EXAMS_VISIBLE_ROLES     = ['student', 'teacher', 'principal', 'headmaster'];
@@ -33,16 +40,33 @@ export function DataProvider({ children }) {
   const [messages,       setMessages]       = useState([]);
   const [directoryUsers, setDirectoryUsers] = useState([]);
   const [subjects,       setSubjects]       = useState([]);
-  const [schoolInfo,     setSchoolInfo]     = useState(defaultSchoolInfo);
+  const [schoolInfo,     setSchoolInfo]     = useState(EMPTY_SCHOOL_INFO);
 
-  // ── School info (public — needed on the pre-login Login/Guest screens too) ──
+  // ── School info + live counts (public — needed on the pre-login screens too) ──
+  // No mock fallback: any failed/missing value stays null and the UI shows 'N/A'.
   useEffect(() => {
     let active = true;
-    readWithFallback(
-      () => configApi.getSchoolInfo(),
-      () => deriveSchoolInfo(),
-      { label: 'getSchoolInfo' },
-    ).then(info => { if (active) setSchoolInfo(info); });
+    (async () => {
+      const results = await Promise.allSettled([
+        configApi.getSchoolInfo(),
+        countsApi.getStudentCount(),
+        countsApi.getStaffCount(),
+        countsApi.getClassCount(),
+      ]);
+      results.forEach(r => {
+        if (r.status === 'rejected') console.debug('[school info/counts] load failed:', r.reason);
+      });
+      if (!active) return;
+      const [infoR, stuR, staffR, clsR] = results;
+      const info = infoR.status === 'fulfilled' && infoR.value && typeof infoR.value === 'object' ? infoR.value : {};
+      const num = (r) => (r.status === 'fulfilled' && typeof r.value === 'number' ? r.value : null);
+      const next = { ...EMPTY_SCHOOL_INFO };
+      Object.keys(EMPTY_SCHOOL_INFO).forEach(k => { next[k] = info[k] ?? null; });
+      next.totalStudents = num(stuR);
+      next.totalStaff = num(staffR);
+      next.totalClasses = num(clsR);
+      setSchoolInfo(next);
+    })();
     return () => { active = false; };
   }, []);
 
@@ -53,7 +77,13 @@ export function DataProvider({ children }) {
       { label: 'updateSchoolInfo' },
     );
     const updated = real ? { ...patch, ...(result || {}) } : result;
-    setSchoolInfo(updated);
+    setSchoolInfo(prev => ({
+      ...prev,
+      ...updated,
+      totalStudents: prev.totalStudents,
+      totalStaff: prev.totalStaff,
+      totalClasses: prev.totalClasses,
+    }));
     return updated;
   };
 

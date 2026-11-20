@@ -3,6 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import * as academicsApi from '../../api/academicsApi';
 import * as peopleApi from '../../api/peopleApi';
+import { na } from '../../utils/display';
 import { readWithFallback, writeWithApi } from '../../api/mockFallback';
 import { errorText } from '../../utils/apiError';
 import { listTable, insertRecord, ONLINE_GRADABLE_TYPES } from '../../data/mockStore';
@@ -321,8 +322,8 @@ function PaperViewer({ paper, classes, onBack }) {
 
       <div className="qp-paper">
         <div className="qp-header">
-          <div className="qp-school-name">{schoolInfo.name}</div>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{schoolInfo.address}</div>
+          <div className="qp-school-name">{na(schoolInfo.name)}</div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{na(schoolInfo.address)}</div>
           <div style={{ fontWeight: 600, fontSize: 16, marginTop: 8 }}>{paper.title}</div>
           <div className="qp-meta">
             <span>Class: <strong>{classLabel(paper.classId, classes)}</strong></span>

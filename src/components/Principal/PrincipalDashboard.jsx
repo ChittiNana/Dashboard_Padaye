@@ -59,7 +59,7 @@ function Dashboard() {
       <div className="page-header">
         <div className="page-header-left">
           <h1>Good Morning, Dr. Kumar 👋</h1>
-          <p>Here's what's happening at {schoolInfo.name} today.</p>
+          <p>Here's what's happening at {schoolInfo.name || 'your school'} today.</p>
         </div>
         <div className="page-header-actions">
           <span className="badge badge-info">Session 2026-27</span>

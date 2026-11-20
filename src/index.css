@@ -556,10 +556,55 @@ textarea.form-control { resize: vertical; min-height: 90px; }
 
 /* ─── LOGIN PAGE ─────────────────────────────────────────────────────────── */
 .login-page {
+  position: relative;
+  overflow: hidden;
   min-height: 100vh;
   display: flex;
   background: linear-gradient(135deg, #0f1928 0%, #1e3a5f 60%, #2c5282 100%);
 }
+/* Scrolling image/video background behind both panels (media list: src/config/loginBackground.js). */
+.login-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: flex;
+  flex-direction: column;
+  pointer-events: none;
+}
+.login-bg-row { flex: 1; min-height: 0; padding: 10px 0; overflow: hidden; }
+.login-bg-track {
+  display: flex;
+  width: max-content;
+  height: 100%;
+  animation: login-bg-scroll var(--login-bg-duration, 60s) linear infinite;
+  will-change: transform;
+}
+.login-bg-row--right .login-bg-track { animation-direction: reverse; }
+.login-bg-tile {
+  flex: 0 0 auto;
+  width: 420px;
+  height: 100%;
+  margin-right: 20px; /* margin (not gap) so sliding exactly half the track loops seamlessly */
+  border-radius: 16px;
+  overflow: hidden;
+  opacity: 0.6;
+}
+.login-bg-tile img,
+.login-bg-tile video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.login-bg-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(15,25,40,0.86) 0%, rgba(30,58,95,0.72) 60%, rgba(44,82,130,0.66) 100%);
+}
+@keyframes login-bg-scroll {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .login-bg-track { animation: none; }
+}
+.login-left,
+.login-right { position: relative; z-index: 1; }
 .login-left {
   flex: 1;
   display: flex;

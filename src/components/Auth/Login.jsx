@@ -2,7 +2,9 @@ import { useState, useMemo } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import { listTable } from '../../data/mockStore';
+import { na, naCount } from '../../utils/display';
 import ProfileAvatar from '../Shared/ProfileAvatar';
+import LoginBackground from './LoginBackground';
 
 export default function Login() {
   const { login, error } = useAuth();
@@ -28,28 +30,29 @@ export default function Login() {
 
   return (
     <div className="login-page">
+      <LoginBackground />
       {/* ── left panel ── */}
       <div className="login-left">
         <div className="login-brand-icon">🏫</div>
-        <div className="login-brand-name">{schoolInfo.name}</div>
+        <div className="login-brand-name">{na(schoolInfo.name)}</div>
         <div className="login-brand-sub">
-          {schoolInfo.affiliation}<br />
-          <em style={{ fontSize: 13, opacity: 0.8 }}>"{schoolInfo.motto}"</em>
+          {na(schoolInfo.affiliation)}<br />
+          <em style={{ fontSize: 13, opacity: 0.8 }}>{schoolInfo.motto ? `"${schoolInfo.motto}"` : 'N/A'}</em>
         </div>
         <div className="login-stats">
           <div className="login-stat">
             <div className="login-stat-icon">👩‍🎓</div>
-            <div className="login-stat-val">{schoolInfo.totalStudents.toLocaleString()}</div>
+            <div className="login-stat-val">{naCount(schoolInfo.totalStudents)}</div>
             <div className="login-stat-lbl">Students</div>
           </div>
           <div className="login-stat">
             <div className="login-stat-icon">👔</div>
-            <div className="login-stat-val">{schoolInfo.totalStaff}</div>
+            <div className="login-stat-val">{naCount(schoolInfo.totalStaff)}</div>
             <div className="login-stat-lbl">Staff</div>
           </div>
           <div className="login-stat">
             <div className="login-stat-icon">🏫</div>
-            <div className="login-stat-val">{schoolInfo.totalClasses}</div>
+            <div className="login-stat-val">{naCount(schoolInfo.totalClasses)}</div>
             <div className="login-stat-lbl">Classes</div>
           </div>
         </div>
@@ -59,7 +62,7 @@ export default function Login() {
       <div className="login-right">
         <div className="login-form">
           <div className="login-title">Welcome Back</div>
-          <div className="login-sub">Sign in to your {schoolInfo.name} portal</div>
+          <div className="login-sub">{schoolInfo.name ? `Sign in to your ${schoolInfo.name} portal` : 'Sign in to your school portal'}</div>
 
           {error && <div className="login-error">⚠ {error}</div>}
 

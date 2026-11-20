@@ -1,5 +1,6 @@
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
+import { na, naCount } from '../../utils/display';
 import FeeManagement from '../Management/FeeManagement';
 import EventCalendar from '../Shared/EventCalendar';
 
@@ -16,28 +17,28 @@ function Dashboard({ user }) {
           <h1>Welcome, {user.name} 👋</h1>
           <p>Role: {roleLabel}</p>
         </div>
-        <span className="badge badge-info">{schoolInfo.name}</span>
+        <span className="badge badge-info">{na(schoolInfo.name)}</span>
       </div>
 
       <div className="stat-grid mb-20">
         <div className="stat-card">
           <div className="stat-icon bg-blue">🏫</div>
           <div className="stat-info">
-            <div className="stat-value">{schoolInfo.totalStudents}</div>
+            <div className="stat-value">{naCount(schoolInfo.totalStudents)}</div>
             <div className="stat-label">Total Students</div>
           </div>
         </div>
         <div className="stat-card">
           <div className="stat-icon bg-green">👔</div>
           <div className="stat-info">
-            <div className="stat-value">{schoolInfo.totalStaff}</div>
+            <div className="stat-value">{naCount(schoolInfo.totalStaff)}</div>
             <div className="stat-label">Total Staff</div>
           </div>
         </div>
         <div className="stat-card">
           <div className="stat-icon bg-purple">🏫</div>
           <div className="stat-info">
-            <div className="stat-value">{schoolInfo.totalClasses}</div>
+            <div className="stat-value">{naCount(schoolInfo.totalClasses)}</div>
             <div className="stat-label">Classes</div>
           </div>
         </div>

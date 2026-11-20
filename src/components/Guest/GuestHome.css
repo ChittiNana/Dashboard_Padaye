@@ -1,0 +1,136 @@
+/* Public home page. All rules are prefixed .gh- so nothing here leaks into the dashboards. */
+.gh-root { background: #f7fafc; color: var(--text-primary); }
+.gh-root.gh-embedded .gh-nav { display: none; }
+.gh-root.gh-embedded .gh-hero { min-height: 420px; border-radius: 16px; }
+.gh-wrap { width: 100%; max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+.gh-section { padding: 88px 0; scroll-margin-top: 64px; }
+.gh-section--alt { background: #fff; }
+.gh-eyebrow { font-size: 12px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--secondary); margin-bottom: 10px; }
+.gh-title { font-size: clamp(26px, 3.4vw, 38px); font-weight: 800; line-height: 1.15; color: var(--primary); margin-bottom: 14px; }
+.gh-lead { font-size: 16px; line-height: 1.7; color: var(--text-secondary); max-width: 640px; }
+.gh-head { margin-bottom: 40px; }
+
+/* ── sticky nav ── */
+.gh-nav {
+  position: sticky; top: 0; z-index: 50;
+  background: rgba(15, 25, 40, 0.82); backdrop-filter: blur(14px);
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+.gh-nav-inner { display: flex; align-items: center; justify-content: space-between; height: 64px; gap: 16px; }
+.gh-brand { display: flex; align-items: center; gap: 10px; color: #fff; font-weight: 800; font-size: 17px; white-space: nowrap; }
+.gh-brand-icon { width: 36px; height: 36px; border-radius: 10px; background: rgba(255,255,255,0.14); display: grid; place-items: center; font-size: 20px; }
+.gh-links { display: flex; align-items: center; gap: 4px; }
+.gh-link { color: rgba(255,255,255,0.78); font-size: 14px; font-weight: 500; padding: 8px 12px; border-radius: 8px; transition: all var(--transition); }
+.gh-link:hover { color: #fff; background: rgba(255,255,255,0.1); }
+
+/* ── buttons ── */
+.gh-btn { display: inline-flex; align-items: center; gap: 8px; border-radius: 10px; font-weight: 700; font-size: 15px; padding: 13px 26px; transition: transform var(--transition), box-shadow var(--transition), background var(--transition); }
+.gh-btn:hover { transform: translateY(-2px); }
+.gh-btn--primary { background: #fff; color: var(--primary); box-shadow: 0 8px 24px rgba(0,0,0,0.25); }
+.gh-btn--ghost { background: rgba(255,255,255,0.12); color: #fff; border: 1px solid rgba(255,255,255,0.35); }
+.gh-btn--ghost:hover { background: rgba(255,255,255,0.2); }
+.gh-btn--sm { padding: 9px 18px; font-size: 14px; background: var(--secondary); color: #fff; }
+.gh-btn--sm:hover { background: var(--secondary-light); }
+
+/* ── hero ── */
+.gh-hero { position: relative; overflow: hidden; min-height: calc(100vh - 64px); min-height: calc(100svh - 64px); display: flex; align-items: center; justify-content: center; text-align: center; color: #fff; background: linear-gradient(135deg, #0f1928 0%, #1e3a5f 60%, #2c5282 100%); }
+/* photo slideshow behind the hero text (photos: src/config/homeBackground.js) */
+.gh-slides, .gh-slides-stack { position: absolute; inset: 0; }
+.gh-slides { z-index: 0; }
+.gh-slide { position: absolute; inset: 0; opacity: 0; transition: opacity 1.4s ease-in-out; }
+.gh-slide.is-active { opacity: 1; }
+.gh-slide img { width: 100%; height: 100%; object-fit: cover; display: block; transform: scale(1.02); transform-origin: 50% 50%; transition: transform 0s linear 1.4s; }
+.gh-slide--alt img { transform-origin: 30% 60%; }
+.gh-slide.is-active img { transform: scale(1.14); transition: transform 14s ease-out; } /* slow zoom while shown; resets after it has faded out */
+.gh-slides-overlay { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(10,18,32,0.58) 0%, rgba(15,25,40,0.7) 55%, rgba(15,25,40,0.9) 100%); }
+.gh-dots { position: absolute; z-index: 1; left: 0; right: 0; bottom: 132px; display: flex; justify-content: center; gap: 10px; }
+.gh-dot { width: 10px; height: 10px; padding: 0; border-radius: 999px; background: rgba(255,255,255,0.4); transition: all var(--transition); }
+.gh-dot:hover { background: rgba(255,255,255,0.75); }
+.gh-dot.is-active { width: 28px; background: #fff; }
+@media (prefers-reduced-motion: reduce) {
+  .gh-slide { transition: opacity 0.4s linear; }
+  .gh-slide img, .gh-slide.is-active img { transform: none; transition: none; }
+}
+.gh-hero-content { position: relative; z-index: 1; padding: 80px 24px 140px; max-width: 860px; }
+.gh-hero-badge { display: inline-block; padding: 7px 16px; border-radius: 999px; background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.22); font-size: 13px; font-weight: 600; letter-spacing: 0.04em; margin-bottom: 24px; }
+.gh-hero h1 { font-size: clamp(34px, 6vw, 64px); font-weight: 800; line-height: 1.08; margin-bottom: 18px; text-shadow: 0 4px 30px rgba(0,0,0,0.35); }
+.gh-hero-motto { font-size: clamp(16px, 2vw, 21px); font-style: italic; opacity: 0.92; margin-bottom: 34px; }
+.gh-hero-actions { display: flex; justify-content: center; gap: 14px; flex-wrap: wrap; }
+.gh-scroll-hint { position: absolute; z-index: 1; bottom: 96px; left: 50%; transform: translateX(-50%); color: rgba(255,255,255,0.7); font-size: 22px; animation: gh-bounce 2s ease-in-out infinite; }
+@keyframes gh-bounce { 0%,100% { transform: translate(-50%, 0); } 50% { transform: translate(-50%, 8px); } }
+
+/* ── stats strip overlapping the hero ── */
+.gh-stats { position: relative; z-index: 2; margin-top: -64px; }
+.gh-stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+.gh-stat { background: #fff; border-radius: 16px; padding: 24px 16px; text-align: center; box-shadow: var(--shadow-lg); }
+.gh-stat-icon { font-size: 26px; margin-bottom: 6px; }
+.gh-stat-val { font-size: 32px; font-weight: 800; color: var(--primary); line-height: 1.1; }
+.gh-stat-lbl { font-size: 13px; color: var(--text-muted); margin-top: 4px; font-weight: 500; }
+
+/* ── about ── */
+.gh-about { display: grid; grid-template-columns: 1.3fr 1fr; gap: 48px; align-items: start; }
+.gh-about p { font-size: 16px; line-height: 1.8; color: var(--text-secondary); margin-bottom: 16px; }
+.gh-facts { background: linear-gradient(135deg, var(--primary), var(--primary-light)); color: #fff; border-radius: 20px; padding: 32px; box-shadow: var(--shadow-xl); }
+.gh-fact + .gh-fact { margin-top: 20px; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.15); }
+.gh-fact-lbl { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; opacity: 0.65; }
+.gh-fact-val { font-size: 17px; font-weight: 600; margin-top: 4px; }
+
+/* ── portal feature cards ── */
+.gh-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+.gh-card { background: #fff; border: 1px solid var(--border); border-radius: 16px; padding: 26px; transition: transform var(--transition), box-shadow var(--transition), border-color var(--transition); }
+.gh-card:hover { transform: translateY(-5px); box-shadow: var(--shadow-lg); border-color: transparent; }
+.gh-card-icon { width: 52px; height: 52px; border-radius: 14px; display: grid; place-items: center; font-size: 26px; margin-bottom: 16px; background: #ebf8ff; }
+.gh-card h3 { font-size: 17px; font-weight: 700; color: var(--primary); margin-bottom: 8px; }
+.gh-card p { font-size: 14px; line-height: 1.65; color: var(--text-secondary); }
+
+/* ── holidays ── */
+.gh-cal { display: grid; grid-template-columns: 1fr 1.1fr; gap: 32px; align-items: start; }
+.gh-upcoming { display: grid; gap: 12px; }
+.gh-holiday { display: flex; gap: 16px; align-items: center; background: #fff; border: 1px solid var(--border); border-radius: 14px; padding: 14px 18px; transition: transform var(--transition), box-shadow var(--transition); }
+.gh-holiday:hover { transform: translateX(4px); box-shadow: var(--shadow-md); }
+.gh-date { flex: 0 0 62px; text-align: center; border-radius: 12px; padding: 8px 0; color: #fff; background: var(--secondary); }
+.gh-date--National { background: var(--danger); }
+.gh-date--Festival { background: var(--warning); }
+.gh-date--Regional { background: var(--purple); }
+.gh-date-day { font-size: 22px; font-weight: 800; line-height: 1; }
+.gh-date-mon { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; margin-top: 3px; }
+.gh-holiday-name { font-weight: 700; font-size: 15px; }
+.gh-holiday-desc { font-size: 12.5px; color: var(--text-muted); margin-top: 2px; }
+.gh-empty { color: var(--text-muted); font-size: 14px; padding: 20px; background: #fff; border-radius: 14px; border: 1px dashed var(--border); }
+.gh-all { margin-top: 28px; background: #fff; border: 1px solid var(--border); border-radius: 14px; padding: 4px 18px; }
+.gh-all summary { cursor: pointer; font-weight: 700; color: var(--primary); padding: 14px 0; }
+.gh-all-row { display: grid; grid-template-columns: 130px 1fr auto; gap: 12px; padding: 10px 0; border-top: 1px solid var(--border); font-size: 13.5px; align-items: center; }
+
+/* ── contact ── */
+.gh-grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+.gh-contact { text-align: center; }
+.gh-contact .gh-card-icon { margin: 0 auto 14px; }
+.gh-contact a { color: var(--secondary); font-weight: 600; word-break: break-word; }
+.gh-contact a:hover { text-decoration: underline; }
+
+/* ── footer ── */
+.gh-footer { background: #0f1928; color: rgba(255,255,255,0.7); text-align: center; padding: 32px 24px; font-size: 14px; }
+.gh-footer strong { color: #fff; }
+
+/* ── scroll reveal ── */
+.gh-reveal { opacity: 0; transform: translateY(28px); transition: opacity 0.7s ease, transform 0.7s ease; transition-delay: var(--gh-delay, 0s); }
+.gh-reveal.is-visible { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) {
+  .gh-reveal { opacity: 1; transform: none; transition: none; }
+  .gh-scroll-hint { animation: none; }
+}
+
+/* ── responsive ── */
+@media (max-width: 960px) {
+  .gh-about, .gh-cal { grid-template-columns: 1fr; }
+  .gh-grid-3 { grid-template-columns: repeat(2, 1fr); }
+  .gh-grid-4 { grid-template-columns: repeat(2, 1fr); }
+  .gh-stats-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 640px) {
+  .gh-section { padding: 64px 0; }
+  .gh-links .gh-link { display: none; }
+  .gh-grid-3, .gh-grid-4 { grid-template-columns: 1fr; }
+  .gh-brand span.gh-brand-name { max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
+  .gh-all-row { grid-template-columns: 1fr; gap: 4px; }
+}
